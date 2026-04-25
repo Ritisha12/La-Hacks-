@@ -5,10 +5,10 @@ import { format, quality } from '@cloudinary/url-gen/actions/delivery';
 import { auto } from '@cloudinary/url-gen/qualifiers/format';
 import { auto as autoQuality } from '@cloudinary/url-gen/qualifiers/quality';
 import { autoGravity } from '@cloudinary/url-gen/qualifiers/gravity';
-import { cld, uploadPreset } from './cloudinary/config';
-import { UploadWidget } from './cloudinary/UploadWidget';
-import type { CloudinaryUploadResult } from './cloudinary/UploadWidget';
-import './App.css';
+import { cld, uploadPreset } from '../../cloudinary/config';
+import { UploadWidget } from '../../cloudinary/UploadWidget';
+import type { CloudinaryUploadResult } from '../../cloudinary/UploadWidget';
+import '../../styles/App.css';
 
 const hasUploadPreset = Boolean(uploadPreset);
 
@@ -40,6 +40,7 @@ function App() {
     //   result.resource_type — 'image', 'video', or 'raw'
     setUploadedImageId(result.public_id);
     setUploadedUrl(result.secure_url); // store the URL to use anywhere in your app
+
   };
 
   const handleUploadError = (error: Error) => {
@@ -69,6 +70,7 @@ function App() {
 
   return (
     <div className="app">
+      <h1>"Hellooo"</h1>
       <main className="main-content">
         <h1>Cloudinary React Starter Kit</h1>
         <p>This is a ready-to-use development environment with Cloudinary integration.</p>
