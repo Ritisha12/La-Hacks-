@@ -7,12 +7,7 @@ yarn-error.log*
 pnpm-debug.log*
 lerna-debug.log*
 
-node_modules/
-**/node_modules/
 node_modules
-.venv
-__pycache__
-
 dist
 dist-ssr
 *.local
@@ -21,21 +16,19 @@ dist-ssr
 .env
 .env.local
 .env.production
-!.env.example
-
 # Server-only env (for secure signed uploads); do not commit API secret
 server/.env
 
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json
-.idea/
+.idea
 .DS_Store
-*.sw?
 *.suo
 *.ntvs*
 *.njsproj
 *.sln
+*.sw?
 
 #The data that is too big
 Backend/data/
