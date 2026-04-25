@@ -1,0 +1,49 @@
+# Multimodal query: transit + ride-hail proxy (CAR_DROP_OFF access, CAR_PICKUP egress)
+# Endpoint: POST http://localhost:8080/otp/gtfs/v1
+# direct: [WALK] prevents OTP from returning a pure car itinerary
+
+{
+  planConnection(
+    origin:      { location: { coordinate: { latitude: 34.0522, longitude: -118.2437 } } }
+    destination: { location: { coordinate: { latitude: 34.0194, longitude: -118.4912 } } }
+    first: 5
+    modes: {
+      direct: [WALK]
+      transit: {
+        access:  [WALK, CAR_DROP_OFF]
+        egress:  [WALK, CAR_PICKUP]
+        transit: [
+          { mode: BUS }
+          { mode: RAIL }
+          { mode: SUBWAY }
+          { mode: TRAM }
+        ]
+      }
+    }
+  ) {
+    routingErrors { code description }
+    edges {
+      node {
+        duration
+        walkTime
+        waitingTime
+        numberOfTransfers
+        generalizedCost
+        start
+        end
+        legs {
+          mode
+          duration
+          distance
+          transitLeg
+          realTime
+          start { scheduledTime }
+          end   { scheduledTime }
+          from  { name lat lon }
+          to    { name lat lon }
+          route { shortName longName }
+        }
+      }
+    }
+  }
+}
