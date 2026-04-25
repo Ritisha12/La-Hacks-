@@ -29,3 +29,6 @@ server/.env
 *.njsproj
 *.sln
 *.sw?
+
+#The data that is too big
+Backend/data/

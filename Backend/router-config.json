@@ -1,0 +1,75 @@
+{
+  "updaters": [
+    {
+      "type": "stop-time-updater",
+      "feedId": "us_ca_lacmta_bus",
+      "url": "https://api.goswift.ly/real-time/lametro/gtfs-rt-trip-updates",
+      "frequency": "15s",
+      "backwardsDelayPropagationType": "REQUIRED_NO_DATA",
+      "fuzzyTripMatching": true,
+      "headers": {
+        "Authorization": "${SWIFTLYAPI}"
+      }
+    },
+    {
+      "type": "stop-time-updater",
+      "feedId": "us_ca_lacmta_rail",
+      "url": "https://api.goswift.ly/real-time/lametro-rail/gtfs-rt-trip-updates",
+      "frequency": "15s",
+      "backwardsDelayPropagationType": "REQUIRED_NO_DATA",
+      "fuzzyTripMatching": true,
+      "headers": {
+        "Authorization": "${SWIFTLYAPI}"
+      }
+    },
+    {
+      "type": "vehicle-positions",
+      "feedId": "us_ca_lacmta_bus",
+      "url": "https://api.goswift.ly/real-time/lametro/gtfs-rt-vehicle-positions",
+      "frequency": "5s",
+      "fuzzyTripMatching": true,
+      "features": ["position"],
+      "headers": {
+        "Authorization": "${SWIFTLYAPI}"
+      }
+    },
+    {
+      "type": "vehicle-positions",
+      "feedId": "us_ca_lacmta_rail",
+      "url": "https://api.goswift.ly/real-time/lametro-rail/gtfs-rt-vehicle-positions",
+      "frequency": "5s",
+      "fuzzyTripMatching": true,
+      "features": ["position"],
+      "headers": {
+        "Authorization": "${SWIFTLYAPI}"
+      }
+    },
+    {
+      "type": "real-time-alerts",
+      "feedId": "us_ca_lacmta_bus",
+      "url": "https://api.goswift.ly/real-time/lametro/gtfs-rt-alerts",
+      "frequency": "1m",
+      "fuzzyTripMatching": true,
+      "headers": {
+        "Authorization": "${SWIFTLYAPI}"
+      }
+    },
+    {
+      "type": "real-time-alerts",
+      "feedId": "us_ca_lacmta_rail",
+      "url": "https://api.goswift.ly/real-time/lametro-rail/gtfs-rt-alerts",
+      "frequency": "1m",
+      "fuzzyTripMatching": true,
+      "headers": {
+        "Authorization": "${SWIFTLYAPI}"
+      }
+    },
+    {
+      "type": "vehicle-rental",
+      "sourceType": "gbfs",
+      "url": "https://gbfs.bcycle.com/bcycle_lametro/gbfs.json",
+      "network": "MetroBikeShare",
+      "frequency": "1m"
+    }
+  ]
+}
