@@ -2,6 +2,7 @@ from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from dotenv import load_dotenv
+from PathParsing import annotate_plan
 
 import httpx
 import os
@@ -163,5 +164,6 @@ async def query_routes(request: RouteRequest):
     routing_errors = data.get("data", {}).get("planConnection", {}).get("routingErrors", [])
     if routing_errors:
         raise HTTPException(status_code=400, detail=routing_errors)
-
-    return data.get("data", {})
+    
+    plan_connection = data.get("data", {}).get("planConnection", {})
+    return {"planConnection": annotate_plan(plan_connection)}
