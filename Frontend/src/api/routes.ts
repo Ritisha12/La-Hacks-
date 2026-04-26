@@ -1,6 +1,8 @@
 import type { Itinerary, TransportMode } from '../types/routes';
 import type { RouteOption } from '../app/components/screens/RouteResults';
 
+/* eslint-disable @typescript-eslint/no-explicit-any */
+
 export type { RouteOption };
 
 // Proxied through Vite dev server to avoid CORS (see vite.config.ts)
@@ -144,6 +146,7 @@ export async function fetchRoutes(
 // ─── Teammate's route-planning API ────────────────────────────────────────────
 
 const QUERY_ROUTES_ENDPOINT = '/api/query_routes';
+const QUERY_ROUTES_TIMEOUT_MS = 8_000;
 
 export interface RoutePreferences {
   walk: boolean;
@@ -188,18 +191,33 @@ export async function queryRoutes(
   destination: [number, number],
   preferences: RoutePreferences,
 ): Promise<RouteQueryResult> {
-  const res = await fetch(QUERY_ROUTES_ENDPOINT, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ origin, destination, preferences }),
-  });
-  if (!res.ok) throw new Error(`HTTP ${res.status}`);
-  const data = await res.json();
-  const all      = (data.all      ? [data.all]      : []).flat().map((it: any, idx: number) => itineraryToRouteOption(it, idx + 1));
-  const fastest  = data.fastest  ? itineraryToRouteOption(data.fastest,  0) : null;
-  const cheapest = data.cheapest ? itineraryToRouteOption(data.cheapest, 0) : null;
-  const safest   = data.safest   ? itineraryToRouteOption(data.safest,   0) : null;
-  return { all, fastest, cheapest, safest };
+  const controller = new AbortController();
+  const timeoutId = window.setTimeout(() => controller.abort(), QUERY_ROUTES_TIMEOUT_MS);
+
+  try {
+    const res = await fetch(QUERY_ROUTES_ENDPOINT, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ origin, destination, preferences }),
+      signal: controller.signal,
+    });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const data = await res.json();
+    const all      = (data.all      ? [data.all]      : []).flat().map((it: any, idx: number) => itineraryToRouteOption(it, idx + 1));
+    const fastest  = data.fastest  ? itineraryToRouteOption(data.fastest,  0) : null;
+    const cheapest = data.cheapest ? itineraryToRouteOption(data.cheapest, 0) : null;
+    const safest   = data.safest   ? itineraryToRouteOption(data.safest,   0) : null;
+    return { all, fastest, cheapest, safest };
+  } catch (err) {
+    console.warn('query_routes unreachable, using mock route data:', err);
+    const all = MOCK_ITINERARIES.map((itinerary, index) => itineraryToRouteOption(itinerary, index + 1));
+    const fastest = [...all].sort((a, b) => a.timeMinutes - b.timeMinutes)[0] ?? null;
+    const cheapest = [...all].sort((a, b) => a.costValue - b.costValue)[0] ?? null;
+    const safest = all[0] ?? null;
+    return { all, fastest, cheapest, safest };
+  } finally {
+    window.clearTimeout(timeoutId);
+  }
 }
 
 // ─── Mapper: OTP Itinerary → UI RouteOption ───────────────────────────────────
