@@ -180,6 +180,7 @@ export interface RouteQueryResult {
   fastest:  RouteOption | null;
   cheapest: RouteOption | null;
   safest:   RouteOption | null;
+  car:      RouteOption | null;
 }
 
 /** Calls POST /query_routes. Throws on network/HTTP error so the caller can show a visible error. */
@@ -199,7 +200,10 @@ export async function queryRoutes(
   const fastest  = data.fastest  ? itineraryToRouteOption(data.fastest,  0) : null;
   const cheapest = data.cheapest ? itineraryToRouteOption(data.cheapest, 0) : null;
   const safest   = data.safest   ? itineraryToRouteOption(data.safest,   0) : null;
-  return { all, fastest, cheapest, safest };
+  // data.car = backend's Waymo-assisted route pick. Legs may be WALK/BUS but the route
+  // is treated as Waymo-eligible — force hasWaymo so the frontend filter can include it.
+  const car = data.car ? { ...itineraryToRouteOption(data.car, 0), hasWaymo: true } : null;
+  return { all, fastest, cheapest, safest, car };
 }
 
 // ─── Mapper: OTP Itinerary → UI RouteOption ───────────────────────────────────
