@@ -3,6 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from dotenv import load_dotenv
 from PathParsing import annotate_plan
+from SafetyScoring import get_safest
 
 import asyncio
 import httpx
@@ -244,9 +245,11 @@ async def query_routes(request: RouteRequest):
 
     fastest = min(nodes, key=lambda n: n.get("duration", float("inf")))
     cheapest = min(nodes, key=lambda n: n.get("total_cost", float("inf")))
+    safest = get_safest(nodes)
 
     return {
         "fastest": fastest,
         "cheapest": cheapest,
+        "safest": safest,
         "all": nodes,
     }

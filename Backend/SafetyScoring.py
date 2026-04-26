@@ -72,6 +72,13 @@ def safest_itinerary(itineraries: list[dict], tree: KDTree, intensities: np.ndar
     return max(scored, key=lambda it: it["min_safety_score"])
 
 
+_tree, _intensities = load_heatmap(HEATMAP_PATH)
+
+
+def get_safest(itineraries: list[dict]) -> dict:
+    return safest_itinerary(itineraries, _tree, _intensities)
+
+
 def annotate_safety(itinerary: dict, tree: KDTree, intensities: np.ndarray) -> dict:
     """
     Adds 'safety_score' to each leg and 'min_safety_score' to the itinerary.
