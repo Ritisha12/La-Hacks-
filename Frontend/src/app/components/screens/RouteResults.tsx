@@ -66,7 +66,6 @@ export function RouteResults({ origin, destination, destinationName, onBack, onS
   const [sortBy, setSortBy] = React.useState<SortType>('ai');
   const [preferences, setPreferences] = React.useState<Set<PreferenceType>>(new Set(['metro', 'bus', 'bike', 'waymo']));
   const [expandedRoute, setExpandedRoute] = React.useState<number | null>(null);
-  const [selectedRouteId, setSelectedRouteId] = React.useState<number | null>(null);
   const [liveData, setLiveData] = React.useState<RouteQueryResult | null>(null);
   const [loading, setLoading] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
@@ -81,8 +80,10 @@ export function RouteResults({ origin, destination, destinationName, onBack, onS
     const prefs = uiPrefsToApiPrefs(metro, bus, bike, waymo);
     console.log('[query_routes] request:', { origin, destination, preferences: prefs });
 
-    setLoading(true);
-    setError(null);
+    queueMicrotask(() => {
+      setLoading(true);
+      setError(null);
+    });
     queryRoutes(origin, destination, prefs)
       .then(result => {
         console.log('[query_routes] response:', result);
@@ -421,20 +422,10 @@ export function RouteResults({ origin, destination, destinationName, onBack, onS
               {/* Actions */}
               <div className="flex gap-2">
                 <button
-                  onClick={() => {
-                    if (selectedRouteId === route.id) {
-                      onStartNavigation(route);
-                    } else {
-                      setSelectedRouteId(route.id);
-                    }
-                  }}
-                  className={`flex-1 py-3 rounded-xl font-semibold text-sm active:scale-95 transition-all shadow-md ${
-                    selectedRouteId === route.id
-                      ? 'bg-gradient-to-r from-[#E91C77] to-[#E95A2B] text-white'
-                      : 'bg-[#0099D8] text-white'
-                  }`}
+                  onClick={() => onStartNavigation(route)}
+                  className="flex-1 py-3 rounded-xl bg-gradient-to-r from-[#E91C77] to-[#E95A2B] font-semibold text-sm text-white active:scale-95 transition-all shadow-md"
                 >
-                  {selectedRouteId === route.id ? 'Start Navigating' : 'Select This Route'}
+                  Start Navigating
                 </button>
                 <button
                   onClick={() => setExpandedRoute(expandedRoute === route.id ? null : route.id)}

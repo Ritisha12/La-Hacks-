@@ -1,11 +1,52 @@
-import { ArrowLeft, Navigation, Clock, MapPin, AlertTriangle } from 'lucide-react';
-import { useState } from 'react';
+import { ArrowLeft, Clock, MapPin, AlertTriangle } from 'lucide-react';
+import type { LatLngBoundsExpression, LatLngExpression } from 'leaflet';
+import { useEffect, useMemo, useState } from 'react';
+import { CircleMarker, MapContainer, Pane, Polyline, TileLayer, Tooltip, useMap, useMapEvents } from 'react-leaflet';
+import 'leaflet/dist/leaflet.css';
+import { useHeatmapData } from '../../hooks/useHeatmapData';
+import { MapControls } from './MapControls';
 import type { RouteOption } from './RouteResults';
+import { SafetyHeatMap } from './SafetyHeatMap';
 
 interface Props {
   onBack: () => void;
   route: RouteOption;
   destinationName: string;
+}
+
+const SAFETY_LAYER_BOUNDS: LatLngBoundsExpression = [
+  [-85, -180],
+  [85, 180],
+];
+
+const ROUTE_CENTER: LatLngExpression = [34.005, -118.296];
+const DEFAULT_MAP_ZOOM = 12;
+
+const ROUTE_POINTS: LatLngExpression[] = [
+  [34.0484, -118.2595],
+  [34.0489, -118.2518],
+  [34.0182, -118.2857],
+  [34.0107, -118.3005],
+  [33.9934, -118.3317],
+  [33.9535, -118.3392],
+];
+
+function MapZoomBridge({ onZoomChange, zoom }: { onZoomChange: (zoom: number) => void; zoom: number }) {
+  const map = useMap();
+
+  useMapEvents({
+    zoomend() {
+      onZoomChange(map.getZoom());
+    },
+  });
+
+  useEffect(() => {
+    if (map.getZoom() !== zoom) {
+      map.setZoom(zoom);
+    }
+  }, [map, zoom]);
+
+  return null;
 }
 
 export function NavigationView({ onBack, route, destinationName }: Props) {
@@ -15,6 +56,13 @@ export function NavigationView({ onBack, route, destinationName }: Props) {
   const [walkPreference, setWalkPreference]           = useState<'min' | 'max'>('min');
   const [safetyHeatMapEnabled, setSafetyHeatMapEnabled] = useState(true);
   const [metroCrimesEnabled, setMetroCrimesEnabled]   = useState(false);
+  const [zoom, setZoom] = useState(DEFAULT_MAP_ZOOM);
+  const heatmap = useHeatmapData(safetyHeatMapEnabled);
+  const routeMarkers = useMemo(() => ROUTE_POINTS, []);
+
+  const zoomIn = () => setZoom((value) => Math.min(18, value + 1));
+  const zoomOut = () => setZoom((value) => Math.max(10, value - 1));
+  const resetZoom = () => setZoom(DEFAULT_MAP_ZOOM);
 
   return (
     <div className="h-full w-full bg-white flex flex-col">
@@ -95,87 +143,123 @@ export function NavigationView({ onBack, route, destinationName }: Props) {
         </div>
       </div>
 
-      {/* Decorative Map */}
-      <div className="h-44 relative bg-[#E8EDE3] overflow-hidden flex-shrink-0">
+      {/* Route Map */}
+      <div className="h-64 relative bg-[#E8EDE3] overflow-hidden flex-shrink-0">
+        <MapContainer
+          attributionControl={false}
+          center={ROUTE_CENTER}
+          className="h-full w-full"
+          scrollWheelZoom
+          zoom={zoom}
+          zoomControl={false}
+        >
+          <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
+          <MapZoomBridge onZoomChange={setZoom} zoom={zoom} />
+
+          {safetyHeatMapEnabled && (
+            <SafetyHeatMap
+              bounds={SAFETY_LAYER_BOUNDS}
+              error={heatmap.error}
+              loading={heatmap.loading}
+              points={heatmap.points}
+            />
+          )}
+
+          <Pane name="route-shadow" style={{ zIndex: 500 }}>
+            <Polyline
+              pathOptions={{
+                color: '#ffffff',
+                lineCap: 'round',
+                lineJoin: 'round',
+                opacity: 0.92,
+                weight: 12,
+              }}
+              positions={ROUTE_POINTS}
+            />
+          </Pane>
+
+          <Pane name="route-line" style={{ zIndex: 520 }}>
+            <Polyline
+              pathOptions={{
+                color: '#0099D8',
+                lineCap: 'round',
+                lineJoin: 'round',
+                opacity: 0.95,
+                weight: 6,
+              }}
+              positions={ROUTE_POINTS}
+            />
+          </Pane>
+
+          <Pane name="route-points" style={{ zIndex: 560 }}>
+            {routeMarkers.map((point, index) => (
+              <CircleMarker
+                center={point}
+                key={index}
+                pathOptions={{
+                  color: '#ffffff',
+                  fillColor: index === routeMarkers.length - 1 ? '#E91C77' : '#0099D8',
+                  fillOpacity: 1,
+                  opacity: 1,
+                  weight: 3,
+                }}
+                radius={index === routeMarkers.length - 1 ? 10 : 7}
+              >
+                <Tooltip direction="top" offset={[0, -8]} opacity={0.94}>
+                  {index === 0 ? 'Start' : index === routeMarkers.length - 1 ? destinationName : 'Transfer'}
+                </Tooltip>
+              </CircleMarker>
+            ))}
+          </Pane>
+
+          {metroCrimesEnabled && (
+            <Pane name="metro-incidents" style={{ zIndex: 620 }}>
+              {[
+                [34.0489, -118.2518],
+                [34.0182, -118.2857],
+              ].map((point, index) => (
+                <CircleMarker
+                  center={point as LatLngExpression}
+                  key={index}
+                  pathOptions={{
+                    color: '#991b1b',
+                    fillColor: index === 0 ? '#dc2626' : '#f97316',
+                    fillOpacity: 0.78,
+                    opacity: 0.88,
+                    weight: 2,
+                  }}
+                  radius={8}
+                >
+                  <Tooltip direction="top" offset={[0, -8]} opacity={0.94}>
+                    {index === 0 ? '2 incidents' : '1 incident'}
+                  </Tooltip>
+                </CircleMarker>
+              ))}
+            </Pane>
+          )}
+        </MapContainer>
+
+        <MapControls
+          onReset={resetZoom}
+          onZoomIn={zoomIn}
+          onZoomOut={zoomOut}
+          zoom={zoom}
+        />
+
         {safetyHeatMapEnabled && (
-          <>
-            <div className="absolute top-0 left-0 w-2/3 h-full bg-gradient-to-br from-green-500/20 to-transparent rounded-br-[100px] transition-opacity duration-300" />
-            <div className="absolute top-0 right-0 w-1/2 h-full bg-gradient-to-bl from-orange-400/25 to-transparent rounded-bl-[80px] transition-opacity duration-300" />
-            <div className="absolute bottom-0 left-1/4 w-1/2 h-1/2 bg-gradient-to-tr from-red-500/20 to-transparent rounded-tl-[60px] transition-opacity duration-300" />
-            <div className="absolute top-4 right-1/4 z-10 animate-fadeIn">
-              <div className="bg-red-500/10 border-2 border-red-500/30 rounded-lg px-3 py-1.5 backdrop-blur-sm">
-                <div className="flex items-center gap-1">
-                  <AlertTriangle className="w-3.5 h-3.5 text-red-600" />
-                  <span className="text-xs font-medium text-red-700">Moderate Risk</span>
-                </div>
-              </div>
-            </div>
-          </>
-        )}
-
-        {metroCrimesEnabled && (
-          <>
-            <div className="absolute top-8 left-28 z-10 animate-fadeIn">
-              <div className="bg-red-600/20 border-2 border-red-600/50 rounded-full p-1.5 backdrop-blur-sm">
-                <AlertTriangle className="w-3 h-3 text-red-700" />
-              </div>
-              <div className="absolute top-full mt-1 left-1/2 -translate-x-1/2 whitespace-nowrap">
-                <div className="bg-red-600 px-1.5 py-0.5 rounded-md shadow-md">
-                  <p className="text-xs font-medium text-white">2 incidents</p>
-                </div>
-              </div>
-            </div>
-            <div className="absolute bottom-6 right-16 z-10 animate-fadeIn">
-              <div className="bg-orange-500/20 border-2 border-orange-500/50 rounded-full p-1.5 backdrop-blur-sm">
-                <AlertTriangle className="w-3 h-3 text-orange-700" />
-              </div>
-              <div className="absolute top-full mt-1 left-1/2 -translate-x-1/2 whitespace-nowrap">
-                <div className="bg-orange-600 px-1.5 py-0.5 rounded-md shadow-md">
-                  <p className="text-xs font-medium text-white">1 incident</p>
-                </div>
-              </div>
-            </div>
-          </>
-        )}
-
-        <div className="absolute inset-0 opacity-30" style={{
-          backgroundImage: `radial-gradient(circle at 1px 1px, rgba(145,168,137,0.15) 1px, transparent 0)`,
-          backgroundSize: '40px 40px',
-        }} />
-
-        <svg className="absolute inset-0 w-full h-full" style={{ zIndex: 5 }}>
-          <path
-            d="M 40 120 Q 100 90, 160 60 T 340 30"
-            stroke="#0099D8" strokeWidth="6" fill="none"
-            strokeLinecap="round" strokeDasharray="10,5"
-          />
-        </svg>
-
-        {/* Start pin */}
-        <div className="absolute top-20 left-6 z-10">
-          <div className="w-10 h-10 rounded-full bg-[#0099D8] shadow-lg flex items-center justify-center border-2 border-white">
-            <Navigation className="w-5 h-5 text-white" />
-          </div>
-        </div>
-        <div className="absolute top-20 left-6 z-0">
-          <div className="w-10 h-10 rounded-full bg-[#0099D8] opacity-20 animate-ping" />
-        </div>
-
-        {/* Destination pin */}
-        <div className="absolute top-4 right-8 z-10">
-          <div className="w-10 h-10 rounded-full bg-[#E91C77] shadow-lg flex items-center justify-center border-2 border-white">
-            <MapPin className="w-5 h-5 text-white" />
-          </div>
-        </div>
-
-        {/* Safety Legend */}
-        {safetyHeatMapEnabled && (
-          <div className="absolute bottom-2 left-2 z-10 bg-white/90 backdrop-blur-sm rounded-lg p-2 shadow">
-            <div className="flex gap-2">
-              {[['bg-green-500/40', 'Safe'], ['bg-orange-400/40', 'Moderate'], ['bg-red-500/40', 'Caution']].map(([bg, label]) => (
-                <div key={label} className="flex items-center gap-1">
-                  <div className={`w-3 h-3 rounded ${bg}`} />
-                  <span className="text-[10px] text-gray-600">{label}</span>
+          <div className="absolute bottom-3 left-3 z-[800] rounded-xl bg-white/95 p-3 shadow-lg backdrop-blur-sm">
+            <p className="mb-2 text-xs font-semibold text-gray-700">Safety Heat Map</p>
+            <div className="space-y-1.5">
+              {[
+                ['bg-green-500/60', 'Safe / no concern'],
+                ['bg-lime-400/80', 'Low risk'],
+                ['bg-yellow-400/80', 'Moderate'],
+                ['bg-orange-500/80', 'Elevated'],
+                ['bg-red-600/80', 'High risk'],
+              ].map(([bg, label]) => (
+                <div key={label} className="flex items-center gap-2">
+                  <div className={`h-4 w-4 rounded ${bg}`} />
+                  <span className="text-xs text-gray-600">{label}</span>
                 </div>
               ))}
             </div>

@@ -30,7 +30,6 @@ function App() {
   useEffect(() => {
     if (!navigator.geolocation) return;
 
-    let watchId: number;
     let retryTimer: ReturnType<typeof setTimeout>;
 
     const onSuccess = (pos: GeolocationPosition) => {
@@ -52,7 +51,7 @@ function App() {
     };
 
     tryGet();
-    watchId = navigator.geolocation.watchPosition(onSuccess, err => {
+    const watchId = navigator.geolocation.watchPosition(onSuccess, err => {
       console.warn('[GPS] watch code', err.code, err.message);
     });
 
