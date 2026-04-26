@@ -107,6 +107,8 @@ async def _enrich_legs(legs: list[dict]) -> list[dict]:
 
         # Apply results
         enriched = []
+        time_shift = 0  # cumulative seconds shift from traffic adjustments
+
         for i, leg in enumerate(legs):
             f, t = dict(leg["from"]), dict(leg["to"])
 
@@ -120,13 +122,33 @@ async def _enrich_legs(legs: list[dict]) -> list[dict]:
 
             new_leg = {**leg, "from": f, "to": t}
 
+            if time_shift != 0:
+                new_leg = _shift_leg_times(new_leg, time_shift)
+
             traffic_key = ("traffic", i)
             if traffic_key in result_map and isinstance(result_map[traffic_key], int):
-                new_leg = {**new_leg, "duration": result_map[traffic_key]}
+                traffic_duration = result_map[traffic_key]
+                delta = traffic_duration - leg.get("duration", traffic_duration)
+                new_leg = {**new_leg, "duration": traffic_duration}
+                new_leg = _shift_leg_times(new_leg, delta, end_only=True)
+                time_shift += delta
 
             enriched.append(new_leg)
 
     return enriched
+
+
+def _shift_leg_times(leg: dict, seconds: int, end_only: bool = False) -> dict:
+    from datetime import timedelta
+    def shift(iso: str) -> str:
+        dt = datetime.fromisoformat(iso)
+        return (dt + timedelta(seconds=seconds)).isoformat()
+
+    new_leg = dict(leg)
+    if not end_only:
+        new_leg["start"] = {**leg["start"], "scheduledTime": shift(leg["start"]["scheduledTime"])}
+    new_leg["end"] = {**leg["end"], "scheduledTime": shift(leg["end"]["scheduledTime"])}
+    return new_leg
 
 
 def _leg_cost(leg: dict, first_tap_time: datetime | None) -> tuple[float, datetime | None]:
