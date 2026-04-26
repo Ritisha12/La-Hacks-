@@ -67,7 +67,6 @@ export function RouteResults({ origin, destination, destinationName, onBack, onS
   const [sortBy, setSortBy] = React.useState<SortType>('ai');
   const [preferences, setPreferences] = React.useState<Set<PreferenceType>>(new Set(['metro', 'bus', 'bike', 'waymo']));
   const [expandedRoute, setExpandedRoute] = React.useState<number | null>(null);
-  const [selectedRouteId, setSelectedRouteId] = React.useState<number | null>(null);
   const [liveData, setLiveData] = React.useState<RouteQueryResult | null>(null);
   const [loading, setLoading] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
@@ -82,8 +81,10 @@ export function RouteResults({ origin, destination, destinationName, onBack, onS
     const prefs = uiPrefsToApiPrefs(metro, bus, bike, waymo);
     console.log('[query_routes] request:', { origin, destination, preferences: prefs });
 
-    setLoading(true);
-    setError(null);
+    queueMicrotask(() => {
+      setLoading(true);
+      setError(null);
+    });
     queryRoutes(origin, destination, prefs)
       .then(result => {
         console.log('[query_routes] response:', result);

@@ -28,7 +28,7 @@ export function SearchScreen({ onBack, onFindRoute }: Props) {
 
   useEffect(() => {
     if (query.trim().length < 3) {
-      setSuggestions([]);
+      queueMicrotask(() => setSuggestions([]));
       return;
     }
 
