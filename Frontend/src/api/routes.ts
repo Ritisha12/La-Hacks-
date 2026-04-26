@@ -179,6 +179,7 @@ export interface RouteQueryResult {
   all:      RouteOption[];
   fastest:  RouteOption | null;
   cheapest: RouteOption | null;
+  safest:   RouteOption | null;
 }
 
 /** Calls POST /query_routes. Throws on network/HTTP error so the caller can show a visible error. */
@@ -197,7 +198,8 @@ export async function queryRoutes(
   const all      = (data.all      ? [data.all]      : []).flat().map((it: any, idx: number) => itineraryToRouteOption(it, idx + 1));
   const fastest  = data.fastest  ? itineraryToRouteOption(data.fastest,  0) : null;
   const cheapest = data.cheapest ? itineraryToRouteOption(data.cheapest, 0) : null;
-  return { all, fastest, cheapest };
+  const safest   = data.safest   ? itineraryToRouteOption(data.safest,   0) : null;
+  return { all, fastest, cheapest, safest };
 }
 
 // ─── Mapper: OTP Itinerary → UI RouteOption ───────────────────────────────────

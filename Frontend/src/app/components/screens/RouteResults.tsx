@@ -92,7 +92,7 @@ export function RouteResults({ origin, destination, destinationName, onBack, onS
       .catch(err => {
         console.error('[query_routes] failed:', err);
         setError('Backend request failed. Check /api/query_routes in Network tab.');
-        setLiveData({ all: [], fastest: null, cheapest: null });
+        setLiveData({ all: [], fastest: null, cheapest: null, safest: null });
       })
       .finally(() => setLoading(false));
   }, [preferences, origin, destination]);
@@ -131,13 +131,16 @@ export function RouteResults({ origin, destination, destinationName, onBack, onS
 
   const getDisplayRoutes = (): RouteOption[] => {
     const pool = liveData?.all ?? [];
+    const anyModeOn = preferences.has('metro') || preferences.has('bus') || preferences.has('bike') || preferences.has('waymo');
 
-    // Mode filtering — hide routes that use a disabled mode
     let filtered = pool.filter(r => {
+      // Hide routes that include a disabled transit mode
       if (!preferences.has('metro') && r.hasMetro)  return false;
       if (!preferences.has('bus')   && r.hasBus)    return false;
       if (!preferences.has('bike')  && r.hasBiking) return false;
       if (!preferences.has('waymo') && r.hasWaymo)  return false;
+      // When transit modes are enabled, hide pure walk-only routes
+      if (anyModeOn && !r.hasMetro && !r.hasBus && !r.hasBiking && !r.hasWaymo) return false;
       return true;
     });
 
@@ -155,8 +158,15 @@ export function RouteResults({ origin, destination, destinationName, onBack, onS
           filtered = [...filtered].sort((a, b) => a.costValue - b.costValue);
           break;
         case 'safest': {
-          const s = { high: 3, medium: 2, low: 1 } as const;
-          filtered = [...filtered].sort((a, b) => s[b.safety] - s[a.safety]);
+          const backendSafest = liveData?.safest;
+          if (backendSafest) {
+            // Put the backend-chosen safest route first, rest follow
+            const rest = filtered.filter(r => r.id !== backendSafest.id);
+            filtered = [backendSafest, ...rest];
+          } else {
+            const s = { high: 3, medium: 2, low: 1 } as const;
+            filtered = [...filtered].sort((a, b) => s[b.safety] - s[a.safety]);
+          }
           break;
         }
         default: // ai — lowest generalizedCost first
