@@ -295,7 +295,9 @@ export function itineraryToRouteOption(it: any, id: number): RouteOption {
     cost:            `$${totalCost.toFixed(2)}`,
     costValue:       totalCost,
     transfers:       Math.max(0, transitLegs.length - 1),
-    safety:          'medium',
+    safety:          typeof it.min_safety_score === 'number'
+                       ? it.min_safety_score >= 0.65 ? 'high' : it.min_safety_score >= 0.35 ? 'medium' : 'low'
+                       : 'medium',
     crowdLevel:      'medium',
     walkingMinutes:  walkMinFinal,
     generalizedCost: typeof it.generalizedCost === 'number' ? it.generalizedCost : totalMin * 2 + totalCost,

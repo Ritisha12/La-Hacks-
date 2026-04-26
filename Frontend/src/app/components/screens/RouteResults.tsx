@@ -1,5 +1,6 @@
-import { ArrowLeft, Clock, DollarSign, Navigation, Shield, Users, Zap, Star, AlertTriangle, MapPin, Sparkles, Timer, Coins, Bike, Footprints, Car } from 'lucide-react';
+import { ArrowLeft, Clock, DollarSign, Navigation, Shield, Users, Zap, Star, AlertTriangle, MapPin, Sparkles, Timer, Coins, Bike, Footprints, Car, Train, Bus } from 'lucide-react';
 import { ImageWithFallback } from '../shared/ImageWithFallback';
+import { getModeIcon } from '../shared/getModeIcon';
 import * as React from 'react';
 import { RouteLoadingAnimation } from './RouteLoadingAnimation';
 import { queryRoutes, uiPrefsToApiPrefs } from '../../../api/routes';
@@ -115,8 +116,8 @@ export function RouteResults({ origin, destination, destinationName, onBack, onS
   ];
 
   const preferenceOptions: PreferenceOption[] = [
-    { id: 'metro',        label: 'Metro',        icon: <span className="text-sm">🚇</span>,         color: 'text-indigo-600',  activeColor: 'bg-indigo-600',  bgColor: 'bg-indigo-50'  },
-    { id: 'bus',          label: 'Bus',          icon: <span className="text-sm">🚌</span>,         color: 'text-orange-600',  activeColor: 'bg-orange-600',  bgColor: 'bg-orange-50'  },
+    { id: 'metro',        label: 'Metro',        icon: <Train      className="w-3.5 h-3.5" />,     color: 'text-indigo-600',  activeColor: 'bg-indigo-600',  bgColor: 'bg-indigo-50'  },
+    { id: 'bus',          label: 'Bus',          icon: <Bus        className="w-3.5 h-3.5" />,     color: 'text-orange-600',  activeColor: 'bg-orange-600',  bgColor: 'bg-orange-50'  },
     { id: 'bike',         label: 'Bike',         icon: <Bike       className="w-3.5 h-3.5" />,     color: 'text-green-600',   activeColor: 'bg-green-600',   bgColor: 'bg-green-50'   },
     { id: 'waymo',        label: 'Waymo',        icon: <Car        className="w-3.5 h-3.5" />,     color: 'text-sky-600',     activeColor: 'bg-sky-600',     bgColor: 'bg-sky-50'     },
     { id: 'less-walking', label: 'Less Walking', icon: <Footprints className="w-3.5 h-3.5" />,     color: 'text-purple-600',  activeColor: 'bg-purple-600',  bgColor: 'bg-purple-50'  },
@@ -225,8 +226,15 @@ export function RouteResults({ origin, destination, destinationName, onBack, onS
 
   const getSafetyColor = (safety: string) => {
     if (safety === 'high')   return 'bg-[#6B8E65] text-white';
+    if (safety === 'medium' && sortBy === 'safest') return 'bg-[#C8D97A] text-[#4a5a00]';
     if (safety === 'medium') return 'bg-[#91A889] text-white';
     return 'bg-[#C71866] text-white';
+  };
+
+  const getSafetyLabel = (safety: string) => {
+    if (safety === 'high')   return 'Safe';
+    if (safety === 'medium') return sortBy === 'safest' ? 'Safer' : 'Moderate';
+    return 'Caution';
   };
 
   const getCrowdColor = (crowd: string) => {
@@ -439,7 +447,7 @@ export function RouteResults({ origin, destination, destinationName, onBack, onS
                         <div className="flex items-start gap-3">
                           <div className="flex flex-col items-center">
                             <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-[#0099D8] to-[#00B8E6] shadow-md flex items-center justify-center relative z-10">
-                              <span className="text-2xl">{step.icon}</span>
+                              {getModeIcon(step.mode, 'md')}
                             </div>
                             {idx < route.steps.length - 1 && (
                               <div className="w-0.5 h-8 bg-gradient-to-b from-[#0099D8] to-gray-300 mt-1" />
@@ -487,7 +495,7 @@ export function RouteResults({ origin, destination, destinationName, onBack, onS
                 <div className="flex items-center gap-2 mb-3 flex-wrap pb-3 border-b border-gray-100">
                   <div className={`px-2.5 py-1 rounded-lg text-xs font-medium flex items-center gap-1 ${getSafetyColor(route.safety)}`}>
                     <Shield className="w-3.5 h-3.5" />
-                    {route.safety === 'high' ? 'Safe' : route.safety === 'medium' ? 'Moderate' : 'Caution'}
+                    {getSafetyLabel(route.safety)}
                   </div>
                   <div className={`px-2.5 py-1 rounded-lg text-xs font-medium flex items-center gap-1 ${getCrowdColor(route.crowdLevel)}`}>
                     <Users className="w-3.5 h-3.5" />
@@ -539,7 +547,7 @@ export function RouteResults({ origin, destination, destinationName, onBack, onS
                               <div className="w-10 h-10 rounded-full bg-gradient-to-br from-[#0099D8] to-[#00B8E6] text-white flex items-center justify-center text-xs font-bold">
                                 {idx + 1}
                               </div>
-                              <span className="text-xl">{step.icon}</span>
+                              {getModeIcon(step.mode, 'sm')}
                             </div>
                             <div className="flex-1">
                               <div className="flex items-center justify-between mb-1">
