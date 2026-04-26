@@ -3,8 +3,6 @@
    Import this in index.css, never hardcode values
    ============================================== */
 
-@import url('https://fonts.googleapis.com/css2?family=Sora:wght@500;600&family=Inter:wght@400&family=IBM+Plex+Mono:wght@400&display=swap');
-
 :root {
   /* --- Transportation Mode Colors --- */
   --color-walk:    #FF5722; /* Poppy   — walk / first-mile */

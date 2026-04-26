@@ -1,43 +1,36 @@
 import { useEffect } from 'react';
-import type { CSSProperties } from 'react';
-
-const COLOR_BAR = ['var(--color-walk)', 'var(--color-waymo)', 'var(--color-metro)', 'var(--color-bike)'];
 
 export function SplashScreen({ onStart }: { onStart: () => void }) {
   useEffect(() => {
-    const t = setTimeout(onStart, 3000);
+    const t = setTimeout(onStart, 2500);
     return () => clearTimeout(t);
   }, [onStart]);
 
-  const screen: CSSProperties = {
-    minHeight: '100vh', display: 'flex', flexDirection: 'column',
-    alignItems: 'center', justifyContent: 'center',
-    backgroundColor: 'var(--color-bg)', position: 'relative', overflow: 'hidden',
-  };
-
   return (
-    <div style={screen}>
-      <h1 style={{ margin: 0, font: 'var(--text-logo)', letterSpacing: -1, color: 'var(--color-text-primary)' }}>
-        LA Route
-      </h1>
-      <p style={{ margin: 'var(--space-sm) 0 var(--space-2xl)', font: 'var(--text-body)', color: 'var(--color-text-secondary)' }}>
-        Smart multimodal commuting for Angelenos
-      </p>
+    <div className="min-h-screen flex flex-col items-center justify-center bg-white relative overflow-hidden">
+      <div className="flex flex-col items-center gap-3 mb-10">
+        <div className="flex items-center gap-2 mb-1">
+          <span className="text-5xl font-bold text-[#E95A2B]">LA</span>
+          <span className="text-5xl font-bold text-[#0099D8]">Route</span>
+        </div>
+        <p className="text-gray-500 text-sm text-center px-8">
+          Smart multimodal commuting for Angelenos
+        </p>
+      </div>
+
       <button
         onClick={onStart}
-        style={{
-          height: 44, padding: '0 var(--space-2xl)',
-          borderRadius: 'var(--radius-sm)', border: 'none',
-          backgroundColor: 'var(--color-metro)', color: '#fff',
-          font: 'var(--text-body)', fontWeight: 500, fontSize: 16, cursor: 'pointer',
-        }}
+        className="px-8 py-3 bg-[#0099D8] text-white rounded-xl font-semibold text-base shadow-lg active:scale-95 transition-transform hover:bg-[#0077B6]"
       >
         Get Started
       </button>
 
-      {/* 4-color bar */}
-      <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: 8, display: 'flex' }}>
-        {COLOR_BAR.map((c, i) => <div key={i} style={{ flex: 1, backgroundColor: c }} />)}
+      {/* 4-color bottom bar */}
+      <div className="absolute bottom-0 left-0 right-0 h-2 flex">
+        <div className="flex-1 bg-[#FF5722]" />
+        <div className="flex-1 bg-[#E91E63]" />
+        <div className="flex-1 bg-[#00BCD4]" />
+        <div className="flex-1 bg-[#76FF03]" />
       </div>
     </div>
   );
