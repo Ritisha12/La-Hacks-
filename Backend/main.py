@@ -78,6 +78,7 @@ class ModePreferences(BaseModel):
     car_dropoff: bool = True
     bicycle: bool = True
     bicycle_rental: bool = True
+    car: bool = True  # pure point-to-point car (Waymo)
 
 
 def build_modes_block(prefs: ModePreferences) -> str:
@@ -116,6 +117,9 @@ def build_modes_block(prefs: ModePreferences) -> str:
     if prefs.bicycle_rental:
         direct_modes.append("BICYCLE_RENTAL")
 
+    if prefs.car:
+        direct_modes.append("CAR")
+
     if not transit_modes and not direct_modes:
         raise ValueError("At least one mode must be enabled.")
 
@@ -152,6 +156,7 @@ def _access_variants(prefs: ModePreferences) -> list[ModePreferences]:
         car_dropoff=False,
         bicycle=False,
         bicycle_rental=False,
+        car=False,  # car-only route is fetched separately via _fetch_car_route
     )
     variants = [ModePreferences(**base)]
     if prefs.car_dropoff:
@@ -236,9 +241,31 @@ async def _fetch_all_variants(request: RouteRequest) -> list[dict]:
     return nodes
 
 
+async def _fetch_car_route(request: RouteRequest) -> dict | None:
+    """Fetch a single point-to-point car itinerary (no transit)."""
+    if not request.preferences.car:
+        return None
+
+    car_prefs = ModePreferences(
+        walk=False, bus=False, rail=False, subway=False, tram=False,
+        car_dropoff=False, bicycle=False, bicycle_rental=False, car=True,
+    )
+    car_request = RouteRequest(origin=request.origin, destination=request.destination, preferences=car_prefs)
+    try:
+        plan = await _fetch_plan(car_request)
+    except HTTPException:
+        return None
+
+    edges = plan.get("edges", [])
+    return edges[0]["node"] if edges else None
+
+
 @app.post("/query_routes")
 async def query_routes(request: RouteRequest):
-    nodes = await _fetch_all_variants(request)
+    nodes, car_node = await asyncio.gather(
+        _fetch_all_variants(request),
+        _fetch_car_route(request),
+    )
 
     if not nodes:
         raise HTTPException(status_code=404, detail="No itineraries found.")
@@ -255,5 +282,6 @@ async def query_routes(request: RouteRequest):
         "safest": safest,
         "min_walk": min_walk,
         "max_walk": max_walk,
+        "car": car_node,
         "all": nodes,
     }
