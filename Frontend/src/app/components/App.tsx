@@ -1,142 +1,167 @@
-import { useState } from 'react';
-import { AdvancedImage, placeholder, lazyload } from '@cloudinary/react';
-import { fill } from '@cloudinary/url-gen/actions/resize';
-import { format, quality } from '@cloudinary/url-gen/actions/delivery';
-import { auto } from '@cloudinary/url-gen/qualifiers/format';
-import { auto as autoQuality } from '@cloudinary/url-gen/qualifiers/quality';
-import { autoGravity } from '@cloudinary/url-gen/qualifiers/gravity';
-import { cld, uploadPreset } from '../../cloudinary/config';
-import { UploadWidget } from '../../cloudinary/UploadWidget';
-import type { CloudinaryUploadResult } from '../../cloudinary/UploadWidget';
-import '../../styles/App.css';
+import { useState, useEffect } from 'react';
+import { Settings, Shield } from 'lucide-react';
+import { SplashScreen } from './screens/SplashScreen';
+import { HomeScreen } from './screens/HomeScreen';
+import { SearchScreen } from './screens/SearchScreen';
+import { RouteResults } from './screens/RouteResults';
+import type { RouteOption } from './screens/RouteResults';
+import { SmartInsights } from './screens/SmartInsights';
+import { SafetyOverlay } from './screens/SafetyOverlay';
+import { NavigationView } from './screens/NavigationView';
+import { SettingsScreen } from './screens/SettingsScreen';
 
-const hasUploadPreset = Boolean(uploadPreset);
+type Screen = 'home' | 'search' | 'routes' | 'insights' | 'safety' | 'navigation' | 'settings';
 
-const PROMPTS_WITH_UPLOAD = [
-  'Create an image gallery with lazy loading and responsive images',
-  'Create a video player that plays a Cloudinary video',
-  'Add image overlays with text or logos',
-];
-
-const PROMPTS_WITHOUT_UPLOAD = [
-  "Let's try uploading — help me add an upload preset and upload widget",
-  ...PROMPTS_WITH_UPLOAD,
-];
+const LA_DEFAULT: [number, number] = [34.0522, -118.2437];
 
 function App() {
-  const [uploadedImageId, setUploadedImageId] = useState<string | null>(null);
-  const [uploadedUrl, setUploadedUrl] = useState<string | null>(null);
-  const [clickedIds, setClickedIds] = useState(new Set<number>());
+  const [started, setStarted]           = useState(false);
+  const [currentScreen, setCurrentScreen] = useState<Screen>('home');
+  const [selectedRoute, setSelectedRoute] = useState<RouteOption | null>(null);
 
-  const handleUploadSuccess = (result: CloudinaryUploadResult) => {
-    console.log('Upload successful:', result);
-    // result contains everything you need to work with the uploaded asset:
-    //   result.public_id   — Cloudinary asset ID (use with cld.image() for transformations)
-    //   result.secure_url  — direct HTTPS URL to the original file
-    //   result.url         — HTTP URL (prefer secure_url)
-    //   result.width / result.height — image dimensions
-    //   result.format      — file format (e.g. 'jpg', 'png', 'webp')
-    //   result.bytes       — file size in bytes
-    //   result.resource_type — 'image', 'video', or 'raw'
-    setUploadedImageId(result.public_id);
-    setUploadedUrl(result.secure_url); // store the URL to use anywhere in your app
+  // GPS origin — shared across HomeScreen (map center) and RouteResults (API call)
+  const [origin, setOrigin] = useState<[number, number]>(LA_DEFAULT);
+  const [gpsFixed, setGpsFixed] = useState(false);
 
-  };
+  // Destination chosen in SearchScreen
+  const [destination, setDestination]     = useState<[number, number]>([34.0194, -118.4912]);
+  const [destinationName, setDestinationName] = useState('SoFi Stadium');
 
-  const handleUploadError = (error: Error) => {
-    console.error('Upload error:', error);
-    alert(`Upload failed: ${error.message}`);
-  };
+  useEffect(() => {
+    if (!navigator.geolocation) return;
 
-  const copyPrompt = (text: string, id: number) => {
-    void navigator.clipboard.writeText(text).then(() => {
-      setClickedIds((prev) => new Set(prev).add(id));
-      setTimeout(() => setClickedIds( (prev) => {
-        const next = new Set(prev);
-        next.delete(id);
-        return next;
-      }), 2000);
+    let watchId: number;
+    let retryTimer: ReturnType<typeof setTimeout>;
+
+    const onSuccess = (pos: GeolocationPosition) => {
+      console.log('[GPS] fix:', pos.coords.latitude, pos.coords.longitude);
+      setOrigin([pos.coords.latitude, pos.coords.longitude]);
+      setGpsFixed(true);
+      clearTimeout(retryTimer);
+    };
+
+    const tryGet = () => {
+      navigator.geolocation.getCurrentPosition(
+        onSuccess,
+        err => {
+          console.warn('[GPS] getCurrentPosition code', err.code, err.message);
+          // POSITION_UNAVAILABLE (2) — retry after 3s
+          if (err.code === 2) retryTimer = setTimeout(tryGet, 3000);
+        },
+      );
+    };
+
+    tryGet();
+    watchId = navigator.geolocation.watchPosition(onSuccess, err => {
+      console.warn('[GPS] watch code', err.code, err.message);
     });
-  };
 
-  // Display uploaded image if available, otherwise show a sample
-  const imageId = uploadedImageId || 'samples/people/bicycle';
-  
-  const displayImage = cld
-    .image(imageId)
-    .resize(fill().width(600).height(400).gravity(autoGravity()))
-    .delivery(format(auto()))
-    .delivery(quality(autoQuality()));
+    return () => {
+      navigator.geolocation.clearWatch(watchId);
+      clearTimeout(retryTimer);
+    };
+  }, []);
+
+  if (!started) {
+    return <SplashScreen onStart={() => setStarted(true)} />;
+  }
 
   return (
-    <div className="app">
-      <h1>"Hellooo"</h1>
-      <main className="main-content">
-        <h1>Cloudinary React Starter Kit</h1>
-        <p>This is a ready-to-use development environment with Cloudinary integration.</p>
-        
-        <div className="upload-section">
-          <h2>Upload an Image</h2>
-          {hasUploadPreset ? (
-            <UploadWidget
-              onUploadSuccess={handleUploadSuccess}
-              onUploadError={handleUploadError}
-              buttonText="Upload Image"
-            />
-          ) : (
-            <div className="upload-placeholder">
-              <p>
-                Upload support is available once you add an unsigned Cloudinary upload preset.
-                Create a preset in the Cloudinary dashboard, then set
-                <code>VITE_CLOUDINARY_UPLOAD_PRESET</code> in your <code>.env</code> file.
-              </p>
-              <p>
-                After updating <code>.env</code>, restart the development server.
-              </p>
-            </div>
-          )}
-        </div>
-
-        <div className="image-section">
-          <h2>Display Image</h2>
-          <AdvancedImage
-            cldImg={displayImage}
-            plugins={[placeholder({ mode: 'blur' }), lazyload()]}
-            alt={uploadedImageId ? 'Your uploaded image' : 'Sample image'}
-            className="display-image"
+    <div className="size-full bg-white flex flex-col relative max-w-md mx-auto overflow-hidden">
+      <div className="flex-1 overflow-hidden">
+        {currentScreen === 'home' && (
+          <HomeScreen
+            coords={origin}
+            gpsFixed={gpsFixed}
+            onSearchRoute={() => setCurrentScreen('search')}
           />
-          {uploadedImageId && (
-            <p className="image-info">Public ID: {uploadedImageId}</p>
-          )}
-          {uploadedUrl && (
-            <p className="image-info">
-              URL:{' '}
-              <a href={uploadedUrl} target="_blank" rel="noopener noreferrer">
-                {uploadedUrl}
-              </a>
-            </p>
-          )}
-        </div>
+        )}
+        {currentScreen === 'search' && (
+          <SearchScreen
+            onBack={() => setCurrentScreen('home')}
+            onFindRoute={(dest, name) => {
+              setDestination(dest);
+              setDestinationName(name);
+              setCurrentScreen('routes');
+            }}
+          />
+        )}
+        {currentScreen === 'routes' && (
+          <RouteResults
+            origin={origin}
+            destination={destination}
+            destinationName={destinationName}
+            onBack={() => setCurrentScreen('search')}
+            onShowInsights={() => setCurrentScreen('insights')}
+            onStartNavigation={(route) => {
+              setSelectedRoute(route);
+              setCurrentScreen('navigation');
+            }}
+          />
+        )}
+        {currentScreen === 'insights' && (
+          <SmartInsights onBack={() => setCurrentScreen('routes')} />
+        )}
+        {currentScreen === 'safety' && (
+          <SafetyOverlay onBack={() => setCurrentScreen('home')} />
+        )}
+        {currentScreen === 'navigation' && selectedRoute && (
+          <NavigationView
+            onBack={() => setCurrentScreen('routes')}
+            route={selectedRoute}
+            destinationName={destinationName}
+          />
+        )}
+        {currentScreen === 'settings' && (
+          <SettingsScreen onBack={() => setCurrentScreen('home')} />
+        )}
+      </div>
 
-        <div className="ai-prompts-section">
-          <h2>🤖 Try Asking Your AI Assistant</h2>
-          <p className="prompts-intro">
-            <strong>Copy and paste</strong> one of these prompts into your AI assistant:
-          </p>
-          <ul className="prompts-list">
-            {(hasUploadPreset ? PROMPTS_WITH_UPLOAD : PROMPTS_WITHOUT_UPLOAD).map((text, i) => (
-              <li
-                key={i}
-                onClick={() => copyPrompt(text, i)}
-                title="Click to copy"
-                className={clickedIds.has(i) ? 'clicked' : ''}
-              >
-                {text}
-              </li>
-            ))}
-          </ul>
+      {(currentScreen === 'home' || currentScreen === 'settings') && (
+        <div className="border-t border-gray-200 bg-white">
+          <div className="flex items-center justify-around px-6 py-4">
+            <button
+              onClick={() => setCurrentScreen('home')}
+              className={`flex flex-col items-center gap-1 transition-colors ${
+                currentScreen === 'home' ? 'text-[#0099D8]' : 'text-gray-400'
+              }`}
+            >
+              <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${
+                currentScreen === 'home' ? 'bg-[#0099D8]/10' : 'bg-gray-100'
+              }`}>
+                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 001 1m-6 0h6" />
+                </svg>
+              </div>
+              <span className="text-xs font-medium">Home</span>
+            </button>
+
+            <button
+              onClick={() => setCurrentScreen('safety')}
+              className="flex flex-col items-center gap-1 text-gray-400 hover:text-[#0099D8] transition-colors"
+            >
+              <div className="w-10 h-10 rounded-xl bg-gray-100 flex items-center justify-center">
+                <Shield className="w-5 h-5" />
+              </div>
+              <span className="text-xs font-medium">Safety</span>
+            </button>
+
+            <button
+              onClick={() => setCurrentScreen('settings')}
+              className={`flex flex-col items-center gap-1 transition-colors ${
+                currentScreen === 'settings' ? 'text-[#0099D8]' : 'text-gray-400'
+              }`}
+            >
+              <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${
+                currentScreen === 'settings' ? 'bg-[#0099D8]/10' : 'bg-gray-100'
+              }`}>
+                <Settings className="w-5 h-5" />
+              </div>
+              <span className="text-xs font-medium">Settings</span>
+            </button>
+          </div>
         </div>
-      </main>
+      )}
     </div>
   );
 }

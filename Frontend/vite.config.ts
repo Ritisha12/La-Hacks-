@@ -1,9 +1,24 @@
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
+import tailwindcss from '@tailwindcss/vite'
 
 // https://vite.dev/config/
 export default defineConfig({
-  plugins: [react()],
+  plugins: [react(), tailwindcss()],
+  server: {
+    proxy: {
+      '/api/otp': {
+        target: 'http://149.248.39.192:8080',
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/api\/otp/, '/otp/gtfs/v1'),
+      },
+      '/api/query_routes': {
+        target: 'http://149.248.39.192:8000',
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/api\/query_routes/, '/query_routes'),
+      },
+    },
+  },
   define: {
     // Analytics: Mark this project as created via create-cloudinary-react CLI
     'process.env.CLOUDINARY_SOURCE': '"cli"',

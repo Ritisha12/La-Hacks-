@@ -1,0 +1,61 @@
+/* ==============================================
+   LA HACKS DESIGN TOKENS — single source of truth
+   Import this in index.css, never hardcode values
+   ============================================== */
+
+:root {
+  /* --- Transportation Mode Colors --- */
+  --color-walk:    #FF5722; /* Poppy   — walk / first-mile */
+  --color-waymo:   #E91E63; /* Scarlet — Waymo / cost highlights */
+  --color-metro:   #00BCD4; /* Bluebell — metro / public transit */
+  --color-bike:    #76FF03; /* Sagebrush — bike / eco options */
+
+  /* --- Neutral Palette --- */
+  --color-bg:             #FAFAFA;
+  --color-text-primary:   #212121;
+  --color-text-secondary: #666666;
+  --color-border:         #EEEEEE;
+
+  /* --- Semantic Aliases (use these in components) --- */
+  --color-primary:   var(--color-metro);   /* main CTA, Start Trip */
+  --color-secondary: var(--color-walk);    /* accents, playful moments */
+  --color-cost:      var(--color-waymo);   /* any fare / cost display */
+
+  /* --- Typography --- */
+  --font-brand: 'Sora', sans-serif;       /* logo, headings */
+  --font-body:  'Inter', sans-serif;      /* descriptions, UI text */
+  --font-data:  'IBM Plex Mono', monospace; /* times, fares, distances */
+
+  --text-logo: 600 40px var(--font-brand);
+  --text-h1:   500 22px var(--font-brand);
+  --text-h2:   500 18px var(--font-brand);
+  --text-body: 400 14px var(--font-body);
+  --text-data: 400 13px var(--font-data);
+
+  /* --- Spacing --- */
+  --space-xs:  4px;
+  --space-sm:  8px;
+  --space-md:  12px;
+  --space-lg:  16px;
+  --space-xl:  24px;
+  --space-2xl: 32px;
+
+  /* --- Border Radius --- */
+  --radius-sm: 8px;   /* buttons, inputs */
+  --radius-md: 16px;  /* route cards */
+  --radius-full: 9999px; /* pills, tags */
+
+  /* --- Shadows --- */
+  --shadow-card: 0 0.5px 4px rgba(0, 0, 0, 0.08);
+
+  /* --- Breakpoints (reference only, use in media queries) --- */
+  /* --bp-mobile: 380px  */
+  /* --bp-tablet: 768px  */
+  /* --bp-desktop: 1200px */
+
+  /* --- Mode → Color Map (mirror of legColorMap in JS) --- */
+  --mode-WALK:    var(--color-walk);
+  --mode-TRANSIT: var(--color-metro);
+  --mode-BIKE:    var(--color-bike);
+  --mode-CAR:     var(--color-waymo);
+}
