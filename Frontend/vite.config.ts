@@ -12,6 +12,11 @@ export default defineConfig({
         changeOrigin: true,
         rewrite: (path) => path.replace(/^\/api\/otp/, '/otp/gtfs/v1'),
       },
+      '/api/query_routes': {
+        target: 'http://149.248.39.192:8000',
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/api\/query_routes/, '/query_routes'),
+      },
     },
   },
   define: {

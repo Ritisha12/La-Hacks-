@@ -1,6 +1,7 @@
 import { ArrowLeft, Clock, DollarSign, Navigation, Shield, Users, Zap, Star, AlertTriangle, MapPin, Sparkles, Timer, Coins, Bike, Footprints } from 'lucide-react';
 import { ImageWithFallback } from '../shared/ImageWithFallback';
 import * as React from 'react';
+import { queryRoutes, uiPrefsToApiPrefs } from '../../../api/routes';
 
 interface RouteStep {
   mode: string;
@@ -50,16 +51,39 @@ interface PreferenceOption {
 }
 
 interface Props {
+  origin: [number, number];
+  destination: [number, number];
+  destinationName: string;
   onBack: () => void;
   onShowInsights: () => void;
   onStartNavigation: (route: RouteOption) => void;
 }
 
-export function RouteResults({ onBack, onShowInsights, onStartNavigation }: Props) {
+export function RouteResults({ origin, destination, destinationName, onBack, onShowInsights, onStartNavigation }: Props) {
   const [sortBy, setSortBy] = React.useState<SortType>('ai');
   const [preferences, setPreferences] = React.useState<Set<PreferenceType>>(new Set(['metro', 'bus', 'bike']));
   const [expandedRoute, setExpandedRoute] = React.useState<number | null>(null);
   const [selectedRouteId, setSelectedRouteId] = React.useState<number | null>(null);
+  const [liveRoutes, setLiveRoutes] = React.useState<RouteOption[] | null>(null);
+  const [loading, setLoading] = React.useState(false);
+
+  // Re-fetch from the backend whenever the mode preferences change
+  React.useEffect(() => {
+    const metro = preferences.has('metro');
+    const bus   = preferences.has('bus');
+    const bike  = preferences.has('bike');
+
+    const prefs = uiPrefsToApiPrefs(metro, bus, bike);
+    console.log('[query_routes] request:', { origin, destination, preferences: prefs });
+
+    setLoading(true);
+    queryRoutes(origin, destination, prefs)
+      .then(routes => {
+        console.log('[query_routes] response:', routes);
+        setLiveRoutes(routes.length ? routes : null);
+      })
+      .finally(() => setLoading(false));
+  }, [preferences, origin, destination]);
 
   const sortOptions: SortOption[] = [
     { id: 'ai',       label: 'AI Pick',  icon: <Sparkles className="w-4 h-4" />, color: 'text-[#0099D8]',  activeColor: 'bg-[#0099D8]',  bgColor: 'bg-[#0099D8]/10'  },
@@ -194,7 +218,8 @@ export function RouteResults({ onBack, onShowInsights, onStartNavigation }: Prop
     return filtered;
   };
 
-  const routes = getFilteredAndSortedRoutes();
+  // Use live API data when available; fall back to local mock data
+  const routes = liveRoutes ?? getFilteredAndSortedRoutes();
 
   const safetyClass = (s: string) =>
     s === 'high'   ? 'bg-[#91A889]/10 text-[#91A889]' :
@@ -216,7 +241,7 @@ export function RouteResults({ onBack, onShowInsights, onStartNavigation }: Prop
           </button>
           <div className="flex-1">
             <p className="text-xs text-gray-500">From: Current Location</p>
-            <p className="text-sm font-semibold text-gray-900">To: SoFi Stadium</p>
+            <p className="text-sm font-semibold text-gray-900">To: {destinationName}</p>
           </div>
           <Navigation className="w-5 h-5 text-[#0099D8]" />
         </div>
@@ -300,15 +325,20 @@ export function RouteResults({ onBack, onShowInsights, onStartNavigation }: Prop
         <div className="flex items-center justify-between mb-2">
           <div className="flex items-center gap-2">
             <h2 className="text-lg font-bold text-gray-900">
-              {routes.length} {routes.length === 1 ? 'Route' : 'Routes'}
+              {loading ? 'Finding routes…' : `${routes.length} ${routes.length === 1 ? 'Route' : 'Routes'}`}
             </h2>
-            {preferences.size !== 3 && (
+            {!loading && preferences.size !== 3 && (
               <span className="px-2 py-0.5 bg-[#0099D8]/10 text-[#0099D8] text-xs rounded-full font-medium">
                 Filtered
               </span>
             )}
+            {loading && (
+              <span className="px-2 py-0.5 bg-[#0099D8]/10 text-[#0099D8] text-xs rounded-full font-medium animate-pulse">
+                Live
+              </span>
+            )}
           </div>
-          <span className="text-xs text-gray-500">vs 45 min driving</span>
+          <span className="text-xs text-gray-500">{liveRoutes ? 'Live data' : 'vs 45 min driving'}</span>
         </div>
 
         {routes.length === 0 && (
