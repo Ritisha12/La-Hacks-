@@ -217,7 +217,7 @@ async def _fetch_plan(request: RouteRequest) -> dict:
     if plan_connection.get("routingErrors"):
         return {"edges": []}
 
-    return annotate_plan(plan_connection)
+    return await annotate_plan(plan_connection)
 
 
 async def _fetch_all_variants(request: RouteRequest) -> list[dict]:
