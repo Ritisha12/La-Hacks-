@@ -12,7 +12,7 @@ import { SettingsScreen } from './screens/SettingsScreen';
 
 type Screen = 'home' | 'search' | 'routes' | 'insights' | 'safety' | 'navigation' | 'settings';
 
-const LA_DEFAULT: [number, number] = [34.0522, -118.2437];
+const LA_DEFAULT: [number, number] = [34.07010038909145, -118.44404798389967];
 
 function App() {
   const [started, setStarted]           = useState(false);
@@ -109,6 +109,8 @@ function App() {
             onBack={() => setCurrentScreen('routes')}
             route={selectedRoute}
             destinationName={destinationName}
+            origin={origin}
+            destination={destination}
           />
         )}
         {currentScreen === 'settings' && (
