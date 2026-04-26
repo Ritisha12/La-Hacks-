@@ -6,6 +6,7 @@ import 'leaflet/dist/leaflet.css';
 
 interface Props {
   coords: [number, number];
+  gpsFixed: boolean;
   onSearchRoute: () => void;
 }
 
@@ -50,7 +51,7 @@ function RecenterMap({ lat, lon }: { lat: number; lon: number }) {
   return null;
 }
 
-export function HomeScreen({ coords, onSearchRoute }: Props) {
+export function HomeScreen({ coords, gpsFixed, onSearchRoute }: Props) {
 
   const currentPreferences = ['Metro', 'Bus', 'Bike'];
 
@@ -77,10 +78,14 @@ export function HomeScreen({ coords, onSearchRoute }: Props) {
       {/* ── Content overlay — pointer-events-none so map stays draggable ── */}
       <div className="relative z-10 h-full flex flex-col pointer-events-none">
 
-        {/* Title */}
-        <div className="px-6 pt-14 pb-2">
-          {/* <h1 className="text-3xl font-bold text-[#E95A2B] drop-shadow-sm">LA Multimodal</h1> */}
-          {/* <p className="text-gray-700 text-sm font-medium drop-shadow-sm">Smart transit for a car-free LA</p> */}
+        {/* GPS debug chip — remove once GPS is confirmed working */}
+        <div className="px-4 pt-4 pb-2">
+          <div className="inline-flex items-center gap-1.5 bg-black/50 backdrop-blur-sm rounded-full px-3 py-1">
+            <div className={`w-2 h-2 rounded-full ${gpsFixed ? 'bg-green-400' : 'bg-yellow-400 animate-pulse'}`} />
+            <span className="text-white text-xs font-mono">
+              {gpsFixed ? `${coords[0].toFixed(4)}, ${coords[1].toFixed(4)}` : 'locating…'}
+            </span>
+          </div>
         </div>
 
         {/* Spacer — open map visible here */}

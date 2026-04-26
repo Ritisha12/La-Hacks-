@@ -1,4 +1,4 @@
-import type { Itinerary, Leg, TransportMode } from '../types/routes';
+import type { Itinerary, TransportMode } from '../types/routes';
 import type { RouteOption } from '../app/components/screens/RouteResults';
 
 export type { RouteOption };
@@ -156,44 +156,48 @@ export interface RoutePreferences {
   bicycle_rental: boolean;
 }
 
-/** Maps the UI preference toggles (metro/bus/bike) to the API preferences shape. */
+/** Maps the UI preference toggles (metro/bus/bike/waymo) to the API preferences shape. */
 export function uiPrefsToApiPrefs(
   metro: boolean,
   bus: boolean,
   bike: boolean,
+  waymo: boolean = true,
 ): RoutePreferences {
   return {
-    walk: true,           // always on
+    walk: true,
     bus,
     rail: metro,
     subway: metro,
     tram: metro,
-    car_dropoff: true,    // Waymo/rideshare — always offer
+    car_dropoff: waymo,
     bicycle: bike,
     bicycle_rental: bike,
   };
 }
 
-/** Calls POST /query_routes and returns RouteOption[] ready for the UI.
- *  Falls back to an empty array on error (caller can show mock data). */
+export interface RouteQueryResult {
+  all:      RouteOption[];
+  fastest:  RouteOption | null;
+  cheapest: RouteOption | null;
+}
+
+/** Calls POST /query_routes. Throws on network/HTTP error so the caller can show a visible error. */
 export async function queryRoutes(
   origin: [number, number],
   destination: [number, number],
   preferences: RoutePreferences,
-): Promise<RouteOption[]> {
-  try {
-    const res = await fetch(QUERY_ROUTES_ENDPOINT, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ origin, destination, preferences }),
-    });
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    const itineraries: Itinerary[] = await res.json();
-    return itineraries.map((it, idx) => itineraryToRouteOption(it, idx + 1));
-  } catch (err) {
-    console.warn('query_routes unreachable:', err);
-    return [];
-  }
+): Promise<RouteQueryResult> {
+  const res = await fetch(QUERY_ROUTES_ENDPOINT, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ origin, destination, preferences }),
+  });
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  const data = await res.json();
+  const all      = (data.all      ? [data.all]      : []).flat().map((it: any, idx: number) => itineraryToRouteOption(it, idx + 1));
+  const fastest  = data.fastest  ? itineraryToRouteOption(data.fastest,  0) : null;
+  const cheapest = data.cheapest ? itineraryToRouteOption(data.cheapest, 0) : null;
+  return { all, fastest, cheapest };
 }
 
 // ─── Mapper: OTP Itinerary → UI RouteOption ───────────────────────────────────
@@ -218,54 +222,60 @@ const MODE_LABEL: Record<TransportMode, string> = {
   CAR:     'Waymo',
 };
 
-/** Rough per-leg cost in dollars (LA Metro flat fare + distance-based CAR). */
-function legCost(leg: Leg): number {
-  switch (leg.mode) {
-    case 'BUS':
-    case 'RAIL':
-    case 'SUBWAY':
-    case 'TRAM':     return 1.75;
-    case 'BICYCLE':  return 2.50;
-    case 'CAR':      return 8.00 + (leg.distance / 1609) * 1.20; // $8 base + $1.20/mi
-    default:         return 0;
-  }
+function legCost(leg: any): number {
+  if (typeof leg.cost === 'number') return leg.cost;
+  return 0;
 }
 
-function legDurationMin(leg: Leg): number {
-  return Math.round((leg.endTime - leg.startTime) / 60000);
+function legDurationMin(leg: any): number {
+  if (typeof leg.duration === 'number') return Math.round(leg.duration / 60);
+  if (leg.startTime && leg.endTime) return Math.round((leg.endTime - leg.startTime) / 60000);
+  return 0;
 }
 
-export function itineraryToRouteOption(it: Itinerary, id: number): RouteOption {
+export function itineraryToRouteOption(it: any, id: number): RouteOption {
   const totalMin  = Math.round(it.duration / 60);
-  const totalCost = it.legs.reduce((sum, l) => sum + legCost(l), 0);
+  const totalCost = typeof it.total_cost === 'number'
+    ? it.total_cost
+    : it.legs.reduce((sum: number, l: any) => sum + legCost(l), 0);
 
-  const transitLegs = it.legs.filter(l => l.mode !== 'WALK');
-  const walkLegs    = it.legs.filter(l => l.mode === 'WALK');
-  const walkMin     = walkLegs.reduce((s, l) => s + legDurationMin(l), 0);
+  const transitLegs = it.legs.filter((l: any) => l.mode !== 'WALK');
+  const walkLegs    = it.legs.filter((l: any) => l.mode === 'WALK');
+  const walkMin     = walkLegs.reduce((s: number, l: any) => s + legDurationMin(l), 0);
 
-  const steps = it.legs.map(leg => ({
-    mode:        MODE_LABEL[leg.mode],
-    icon:        MODE_ICON[leg.mode],
-    location:    leg.from.name,
-    time:        `${legDurationMin(leg)} min`,
-    instruction: leg.route
-      ? `Take ${leg.route.longName || leg.route.shortName}`
-      : leg.mode === 'WALK' ? 'Walk' : MODE_LABEL[leg.mode],
-  }));
+  const steps = it.legs.map((leg: any) => {
+    const mode = leg.mode as TransportMode;
+    return {
+      mode:        MODE_LABEL[mode] ?? leg.mode,
+      icon:        MODE_ICON[mode]  ?? '🚌',
+      location:    leg.from?.name ?? '',
+      time:        `${legDurationMin(leg)} min`,
+      instruction: leg.route
+        ? `Take ${leg.route.longName || leg.route.shortName}`
+        : mode === 'WALK' ? 'Walk' : (MODE_LABEL[mode] ?? leg.mode),
+    };
+  });
+
+  // walkTime from backend (seconds) takes priority over computed walk legs
+  const walkMinFinal = typeof it.walkTime === 'number'
+    ? Math.round(it.walkTime / 60)
+    : walkMin;
 
   return {
     id,
     steps,
-    time:          `${totalMin} min`,
-    timeMinutes:   totalMin,
-    cost:          `$${totalCost.toFixed(2)}`,
-    costValue:     totalCost,
-    transfers:     Math.max(0, transitLegs.length - 1),
-    safety:        'medium',
-    crowdLevel:    'medium',
-    walkingMinutes: walkMin,
-    hasBiking:     it.legs.some(l => l.mode === 'BICYCLE'),
-    hasMetro:      it.legs.some(l => l.mode === 'RAIL' || l.mode === 'SUBWAY' || l.mode === 'TRAM'),
-    hasBus:        it.legs.some(l => l.mode === 'BUS'),
+    time:            `${totalMin} min`,
+    timeMinutes:     totalMin,
+    cost:            `$${totalCost.toFixed(2)}`,
+    costValue:       totalCost,
+    transfers:       Math.max(0, transitLegs.length - 1),
+    safety:          'medium',
+    crowdLevel:      'medium',
+    walkingMinutes:  walkMinFinal,
+    generalizedCost: typeof it.generalizedCost === 'number' ? it.generalizedCost : totalMin * 2 + totalCost,
+    hasBiking:       it.legs.some((l: any) => l.mode === 'BICYCLE'),
+    hasMetro:        it.legs.some((l: any) => l.mode === 'RAIL' || l.mode === 'SUBWAY' || l.mode === 'TRAM'),
+    hasBus:          it.legs.some((l: any) => l.mode === 'BUS'),
+    hasWaymo:        it.legs.some((l: any) => l.mode === 'CAR'),
   };
 }

@@ -1,7 +1,8 @@
-import { ArrowLeft, Clock, DollarSign, Navigation, Shield, Users, Zap, Star, AlertTriangle, MapPin, Sparkles, Timer, Coins, Bike, Footprints } from 'lucide-react';
+import { ArrowLeft, Clock, DollarSign, Navigation, Shield, Users, Zap, Star, AlertTriangle, MapPin, Sparkles, Timer, Coins, Bike, Footprints, Car } from 'lucide-react';
 import { ImageWithFallback } from '../shared/ImageWithFallback';
 import * as React from 'react';
 import { queryRoutes, uiPrefsToApiPrefs } from '../../../api/routes';
+import type { RouteQueryResult } from '../../../api/routes';
 
 interface RouteStep {
   mode: string;
@@ -24,13 +25,15 @@ export interface RouteOption {
   isRecommended?: boolean;
   savingsInfo?: string;
   walkingMinutes: number;
+  generalizedCost: number;
   hasBiking: boolean;
   hasMetro: boolean;
   hasBus: boolean;
+  hasWaymo: boolean;
 }
 
 type SortType = 'ai' | 'fastest' | 'cheapest' | 'safest';
-type PreferenceType = 'metro' | 'bus' | 'bike' | 'less-walking' | 'more-walking';
+type PreferenceType = 'metro' | 'bus' | 'bike' | 'waymo' | 'less-walking' | 'more-walking';
 
 interface SortOption {
   id: SortType;
@@ -61,26 +64,35 @@ interface Props {
 
 export function RouteResults({ origin, destination, destinationName, onBack, onShowInsights, onStartNavigation }: Props) {
   const [sortBy, setSortBy] = React.useState<SortType>('ai');
-  const [preferences, setPreferences] = React.useState<Set<PreferenceType>>(new Set(['metro', 'bus', 'bike']));
+  const [preferences, setPreferences] = React.useState<Set<PreferenceType>>(new Set(['metro', 'bus', 'bike', 'waymo']));
   const [expandedRoute, setExpandedRoute] = React.useState<number | null>(null);
   const [selectedRouteId, setSelectedRouteId] = React.useState<number | null>(null);
-  const [liveRoutes, setLiveRoutes] = React.useState<RouteOption[] | null>(null);
+  const [liveData, setLiveData] = React.useState<RouteQueryResult | null>(null);
   const [loading, setLoading] = React.useState(false);
+  const [error, setError] = React.useState<string | null>(null);
 
   // Re-fetch from the backend whenever the mode preferences change
   React.useEffect(() => {
     const metro = preferences.has('metro');
     const bus   = preferences.has('bus');
     const bike  = preferences.has('bike');
+    const waymo = preferences.has('waymo');
 
-    const prefs = uiPrefsToApiPrefs(metro, bus, bike);
+    const prefs = uiPrefsToApiPrefs(metro, bus, bike, waymo);
     console.log('[query_routes] request:', { origin, destination, preferences: prefs });
 
     setLoading(true);
+    setError(null);
     queryRoutes(origin, destination, prefs)
-      .then(routes => {
-        console.log('[query_routes] response:', routes);
-        setLiveRoutes(routes.length ? routes : null);
+      .then(result => {
+        console.log('[query_routes] response:', result);
+        setLiveData(result);
+        if (!result.all.length) setError('No live routes returned from backend.');
+      })
+      .catch(err => {
+        console.error('[query_routes] failed:', err);
+        setError('Backend request failed. Check /api/query_routes in Network tab.');
+        setLiveData({ all: [], fastest: null, cheapest: null });
       })
       .finally(() => setLoading(false));
   }, [preferences, origin, destination]);
@@ -96,6 +108,7 @@ export function RouteResults({ origin, destination, destinationName, onBack, onS
     { id: 'metro',        label: 'Metro',    icon: <span className="text-sm">🚇</span>,          color: 'text-indigo-600',  activeColor: 'bg-indigo-600',  bgColor: 'bg-indigo-50'  },
     { id: 'bus',          label: 'Bus',      icon: <span className="text-sm">🚌</span>,          color: 'text-orange-600',  activeColor: 'bg-orange-600',  bgColor: 'bg-orange-50'  },
     { id: 'bike',         label: 'Bike',     icon: <Bike        className="w-3.5 h-3.5" />,      color: 'text-green-600',   activeColor: 'bg-green-600',   bgColor: 'bg-green-50'   },
+    { id: 'waymo',        label: 'Waymo',    icon: <Car         className="w-3.5 h-3.5" />,      color: 'text-sky-600',     activeColor: 'bg-sky-600',     bgColor: 'bg-sky-50'     },
     { id: 'less-walking', label: 'Min Walk', icon: <Footprints  className="w-3.5 h-3.5" />,      color: 'text-purple-600',  activeColor: 'bg-purple-600',  bgColor: 'bg-purple-50'  },
     { id: 'more-walking', label: 'Max Walk', icon: <Footprints  className="w-3.5 h-3.5" />,      color: 'text-blue-600',    activeColor: 'bg-blue-600',    bgColor: 'bg-blue-50'    },
   ];
@@ -116,110 +129,45 @@ export function RouteResults({ origin, destination, destinationName, onBack, onS
     });
   };
 
-  const baseRoutes: RouteOption[] = [
-    {
-      id: 1,
-      steps: [
-        { mode: 'Walk',  icon: '🚶', location: '7th St & Figueroa St',  time: '5 min',  instruction: 'Walk to Metro station'  },
-        { mode: 'Metro', icon: '🚇', location: 'Expo Park Station',      time: '12 min', instruction: 'Take Expo Line'          },
-        { mode: 'Waymo', icon: '🚗', location: 'SoFi Stadium',           time: '8 min',  instruction: 'Waymo to destination'   },
-      ],
-      time: '25 min', timeMinutes: 25, cost: '$12.50', costValue: 12.50,
-      transfers: 2, safety: 'high', crowdLevel: 'medium',
-      isRecommended: true, savingsInfo: 'Fastest option right now',
-      walkingMinutes: 5, hasBiking: false, hasMetro: true, hasBus: false,
-    },
-    {
-      id: 2,
-      steps: [
-        { mode: 'Scooter', icon: '🛴', location: 'Venice Blvd',        time: '8 min',  instruction: 'Scooter to bus stop'    },
-        { mode: 'DASH',    icon: '🚌', location: 'La Cienega Station',  time: '15 min', instruction: 'Take DASH Bus F'        },
-        { mode: 'Walk',    icon: '🚶', location: 'SoFi Stadium',        time: '9 min',  instruction: 'Walk to entrance'       },
-      ],
-      time: '32 min', timeMinutes: 32, cost: '$4.75', costValue: 4.75,
-      transfers: 2, safety: 'high', crowdLevel: 'low',
-      savingsInfo: 'Save $7.75',
-      walkingMinutes: 9, hasBiking: false, hasMetro: false, hasBus: true,
-    },
-    {
-      id: 3,
-      steps: [
-        { mode: 'Bike',  icon: '🚴', location: 'Expo/Bundy Station', time: '18 min', instruction: 'Bike to metro'       },
-        { mode: 'Metro', icon: '🚇', location: 'Expo Park',           time: '8 min',  instruction: 'Take Expo Line'      },
-        { mode: 'Walk',  icon: '🚶', location: 'SoFi Stadium',        time: '3 min',  instruction: 'Walk to entrance'   },
-      ],
-      time: '29 min', timeMinutes: 29, cost: '$3.25', costValue: 3.25,
-      transfers: 2, safety: 'medium', crowdLevel: 'low',
-      savingsInfo: 'Most eco-friendly',
-      walkingMinutes: 3, hasBiking: true, hasMetro: true, hasBus: false,
-    },
-    {
-      id: 4,
-      steps: [
-        { mode: 'Metro',   icon: '🚇', location: 'Directly to Expo Park', time: '20 min', instruction: 'Take Expo Line'    },
-        { mode: 'Shuttle', icon: '🚐', location: 'SoFi Stadium',           time: '6 min',  instruction: 'Stadium shuttle'  },
-      ],
-      time: '26 min', timeMinutes: 26, cost: '$6.50', costValue: 6.50,
-      transfers: 1, safety: 'high', crowdLevel: 'medium',
-      savingsInfo: 'Minimal walking',
-      walkingMinutes: 1, hasBiking: false, hasMetro: true, hasBus: false,
-    },
-  ];
+  const getDisplayRoutes = (): RouteOption[] => {
+    const pool = liveData?.all ?? [];
 
-  const getSavingsInfo = (route: RouteOption): string => {
-    if (sortBy === 'fastest') {
-      const min = Math.min(...baseRoutes.map(r => r.timeMinutes));
-      return route.timeMinutes === min ? 'Fastest route' : `+${route.timeMinutes - min} min`;
-    }
-    if (sortBy === 'cheapest') {
-      const min = Math.min(...baseRoutes.map(r => r.costValue));
-      return route.costValue === min ? 'Cheapest route' : `+$${(route.costValue - min).toFixed(2)}`;
-    }
-    if (sortBy === 'safest') {
-      return route.safety === 'high' && route.crowdLevel === 'low' ? 'Safest option'
-           : route.safety === 'high' ? 'High safety' : 'Lower safety';
-    }
-    if (preferences.has('less-walking') || preferences.has('more-walking')) {
-      return `${route.walkingMinutes} min walking`;
-    }
-    return route.savingsInfo || 'AI optimized';
-  };
+    // Mode filtering — hide routes that use a disabled mode
+    let filtered = pool.filter(r => {
+      if (!preferences.has('metro') && r.hasMetro)  return false;
+      if (!preferences.has('bus')   && r.hasBus)    return false;
+      if (!preferences.has('bike')  && r.hasBiking) return false;
+      if (!preferences.has('waymo') && r.hasWaymo)  return false;
+      return true;
+    });
 
-  const getFilteredAndSortedRoutes = (): RouteOption[] => {
-    let filtered = [...baseRoutes];
-    if (!preferences.has('metro')) filtered = filtered.filter(r => !r.hasMetro);
-    if (!preferences.has('bus'))   filtered = filtered.filter(r => !r.hasBus);
-    if (!preferences.has('bike'))  filtered = filtered.filter(r => !r.hasBiking);
-    if (preferences.has('less-walking')) filtered = filtered.filter(r => r.walkingMinutes <= 5);
-    if (preferences.has('more-walking')) filtered = filtered.filter(r => r.walkingMinutes >= 8);
-
-    filtered = filtered.map(r => ({ ...r, isRecommended: false, savingsInfo: getSavingsInfo(r) }));
-
-    const compare: (a: RouteOption, b: RouteOption) => number = (() => {
+    // Walking sort overrides tab sort when active
+    if (preferences.has('less-walking')) {
+      filtered = [...filtered].sort((a, b) => a.walkingMinutes - b.walkingMinutes);
+    } else if (preferences.has('more-walking')) {
+      filtered = [...filtered].sort((a, b) => b.walkingMinutes - a.walkingMinutes);
+    } else {
       switch (sortBy) {
-        case 'fastest':  return (a, b) => a.timeMinutes - b.timeMinutes;
-        case 'cheapest': return (a, b) => a.costValue - b.costValue;
-        case 'safest':   return (a, b) => {
-          const s = { high: 3, medium: 2, low: 1 };
-          const c = { low: 3, medium: 2, high: 1 };
-          return (s[b.safety] * 2 + c[b.crowdLevel]) - (s[a.safety] * 2 + c[a.crowdLevel]);
-        };
-        default: return (a, b) => {
-          const score = (r: RouteOption) =>
-            (r.timeMinutes / 30) * 0.4 + (r.costValue / 10) * 0.3 +
-            (r.safety === 'high' ? 0 : 0.2) + (r.crowdLevel === 'high' ? 0.1 : 0);
-          return score(a) - score(b);
-        };
+        case 'fastest':
+          filtered = [...filtered].sort((a, b) => a.timeMinutes - b.timeMinutes);
+          break;
+        case 'cheapest':
+          filtered = [...filtered].sort((a, b) => a.costValue - b.costValue);
+          break;
+        case 'safest': {
+          const s = { high: 3, medium: 2, low: 1 } as const;
+          filtered = [...filtered].sort((a, b) => s[b.safety] - s[a.safety]);
+          break;
+        }
+        default: // ai — lowest generalizedCost first
+          filtered = [...filtered].sort((a, b) => a.generalizedCost - b.generalizedCost);
       }
-    })();
+    }
 
-    filtered.sort(compare);
-    if (filtered[0]) filtered[0].isRecommended = true;
-    return filtered;
+    return filtered.map((r, i) => ({ ...r, isRecommended: i === 0 }));
   };
 
-  // Use live API data when available; fall back to local mock data
-  const routes = liveRoutes ?? getFilteredAndSortedRoutes();
+  const routes = getDisplayRoutes();
 
   const safetyClass = (s: string) =>
     s === 'high'   ? 'bg-[#91A889]/10 text-[#91A889]' :
@@ -294,9 +242,9 @@ export function RouteResults({ origin, destination, destinationName, onBack, onS
                 );
               })}
             </div>
-            {preferences.size < 3 && (
+            {preferences.size < 4 && (
               <button
-                onClick={() => setPreferences(new Set(['metro', 'bus', 'bike']))}
+                onClick={() => setPreferences(new Set(['metro', 'bus', 'bike', 'waymo']))}
                 className="px-3 py-1.5 text-xs font-medium text-[#0099D8] hover:text-[#0077B6] whitespace-nowrap"
               >
                 Reset
@@ -305,6 +253,19 @@ export function RouteResults({ origin, destination, destinationName, onBack, onS
           </div>
         </div>
       </div>
+
+      {/* Debug: live data status */}
+      <div className="mx-6 mt-3 rounded-xl bg-gray-100 p-3 text-xs text-gray-700">
+        <p><b>Origin:</b> {origin[0].toFixed(5)}, {origin[1].toFixed(5)}</p>
+        <p><b>Destination:</b> {destination[0].toFixed(5)}, {destination[1].toFixed(5)}</p>
+        <p><b>Data:</b> {liveData ? `Live backend routes (${liveData.all.length})` : 'No live data yet'}</p>
+      </div>
+
+      {error && (
+        <div className="mx-6 mt-3 rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700">
+          {error}
+        </div>
+      )}
 
       {/* Smart Insights Banner */}
       <div className="px-6 pt-2 pb-2">
@@ -338,7 +299,7 @@ export function RouteResults({ origin, destination, destinationName, onBack, onS
               </span>
             )}
           </div>
-          <span className="text-xs text-gray-500">{liveRoutes ? 'Live data' : 'vs 45 min driving'}</span>
+          <span className="text-xs text-gray-500">{liveData ? 'Live data' : 'vs 45 min driving'}</span>
         </div>
 
         {routes.length === 0 && (
@@ -357,7 +318,7 @@ export function RouteResults({ origin, destination, destinationName, onBack, onS
           </div>
         )}
 
-        {routes.map((route) => (
+        {routes.map((route: RouteOption) => (
           <div
             key={route.id}
             className={`relative bg-white rounded-2xl overflow-hidden transition-all ${
@@ -401,7 +362,7 @@ export function RouteResults({ origin, destination, destinationName, onBack, onS
               <div className="mb-4">
                 <p className="text-xs font-semibold text-gray-500 mb-3 uppercase tracking-wide">Your Journey</p>
                 <div className="space-y-2">
-                  {route.steps.map((step, idx) => (
+                  {route.steps.map((step: RouteStep, idx: number) => (
                     <div key={idx} className="relative">
                       <div className="flex items-start gap-3">
                         <div className="flex flex-col items-center">
@@ -479,7 +440,7 @@ export function RouteResults({ origin, destination, destinationName, onBack, onS
               <div className="border-t border-gray-100 mt-4 pt-4 px-4 pb-4 bg-gray-50">
                 <h3 className="text-sm font-semibold text-gray-900 mb-4">Step-by-Step</h3>
                 <div className="space-y-3">
-                  {route.steps.map((step, idx) => (
+                  {route.steps.map((step: RouteStep, idx: number) => (
                     <div key={idx} className="relative">
                       <div className="bg-white rounded-xl p-3 shadow-sm">
                         <div className="flex items-start gap-3">

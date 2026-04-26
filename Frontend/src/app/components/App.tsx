@@ -21,6 +21,7 @@ function App() {
 
   // GPS origin — shared across HomeScreen (map center) and RouteResults (API call)
   const [origin, setOrigin] = useState<[number, number]>(LA_DEFAULT);
+  const [gpsFixed, setGpsFixed] = useState(false);
 
   // Destination chosen in SearchScreen
   const [destination, setDestination]     = useState<[number, number]>([34.0194, -118.4912]);
@@ -28,12 +29,37 @@ function App() {
 
   useEffect(() => {
     if (!navigator.geolocation) return;
-    const id = navigator.geolocation.watchPosition(
-      pos => setOrigin([pos.coords.latitude, pos.coords.longitude]),
-      () => {},
-      { enableHighAccuracy: true },
-    );
-    return () => navigator.geolocation.clearWatch(id);
+
+    let watchId: number;
+    let retryTimer: ReturnType<typeof setTimeout>;
+
+    const onSuccess = (pos: GeolocationPosition) => {
+      console.log('[GPS] fix:', pos.coords.latitude, pos.coords.longitude);
+      setOrigin([pos.coords.latitude, pos.coords.longitude]);
+      setGpsFixed(true);
+      clearTimeout(retryTimer);
+    };
+
+    const tryGet = () => {
+      navigator.geolocation.getCurrentPosition(
+        onSuccess,
+        err => {
+          console.warn('[GPS] getCurrentPosition code', err.code, err.message);
+          // POSITION_UNAVAILABLE (2) — retry after 3s
+          if (err.code === 2) retryTimer = setTimeout(tryGet, 3000);
+        },
+      );
+    };
+
+    tryGet();
+    watchId = navigator.geolocation.watchPosition(onSuccess, err => {
+      console.warn('[GPS] watch code', err.code, err.message);
+    });
+
+    return () => {
+      navigator.geolocation.clearWatch(watchId);
+      clearTimeout(retryTimer);
+    };
   }, []);
 
   if (!started) {
@@ -46,6 +72,7 @@ function App() {
         {currentScreen === 'home' && (
           <HomeScreen
             coords={origin}
+            gpsFixed={gpsFixed}
             onSearchRoute={() => setCurrentScreen('search')}
           />
         )}
