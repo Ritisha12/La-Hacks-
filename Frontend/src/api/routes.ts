@@ -211,13 +211,6 @@ export async function queryRoutes(
     // data.car = backend's Waymo-assisted route pick — force hasWaymo so the frontend filter includes it.
     const car = data.car ? { ...itineraryToRouteOption(data.car, 0), hasWaymo: true } : null;
     return { all, fastest, cheapest, safest, car };
-  } catch (err) {
-    console.warn('query_routes unreachable, using mock route data:', err);
-    const all = MOCK_ITINERARIES.map((itinerary, index) => itineraryToRouteOption(itinerary, index + 1));
-    const fastest = [...all].sort((a, b) => a.timeMinutes - b.timeMinutes)[0] ?? null;
-    const cheapest = [...all].sort((a, b) => a.costValue - b.costValue)[0] ?? null;
-    const safest = all[0] ?? null;
-    return { all, fastest, cheapest, safest, car: null };
   } finally {
     window.clearTimeout(timeoutId);
   }
@@ -279,6 +272,15 @@ export function itineraryToRouteOption(it: any, id: number): RouteOption {
     };
   });
 
+  // Build ordered waypoints from each leg's from-point, plus the final to-point
+  const waypoints: [number, number][] = it.legs
+    .filter((l: any) => l.from?.lat != null && l.from?.lon != null)
+    .map((l: any) => [l.from.lat, l.from.lon] as [number, number]);
+  const lastLeg = it.legs[it.legs.length - 1];
+  if (lastLeg?.to?.lat != null && lastLeg?.to?.lon != null) {
+    waypoints.push([lastLeg.to.lat, lastLeg.to.lon]);
+  }
+
   // walkTime from backend (seconds) takes priority over computed walk legs
   const walkMinFinal = typeof it.walkTime === 'number'
     ? Math.round(it.walkTime / 60)
@@ -287,6 +289,7 @@ export function itineraryToRouteOption(it: any, id: number): RouteOption {
   return {
     id,
     steps,
+    waypoints,
     time:            `${totalMin} min`,
     timeMinutes:     totalMin,
     cost:            `$${totalCost.toFixed(2)}`,

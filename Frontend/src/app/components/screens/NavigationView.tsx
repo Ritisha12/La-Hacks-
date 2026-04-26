@@ -12,6 +12,8 @@ interface Props {
   onBack: () => void;
   route: RouteOption;
   destinationName: string;
+  origin: [number, number];
+  destination: [number, number];
 }
 
 const SAFETY_LAYER_BOUNDS: LatLngBoundsExpression = [
@@ -19,17 +21,7 @@ const SAFETY_LAYER_BOUNDS: LatLngBoundsExpression = [
   [85, 180],
 ];
 
-const ROUTE_CENTER: LatLngExpression = [34.005, -118.296];
 const DEFAULT_MAP_ZOOM = 12;
-
-const ROUTE_POINTS: LatLngExpression[] = [
-  [34.0484, -118.2595],
-  [34.0489, -118.2518],
-  [34.0182, -118.2857],
-  [34.0107, -118.3005],
-  [33.9934, -118.3317],
-  [33.9535, -118.3392],
-];
 
 function MapZoomBridge({ onZoomChange, zoom }: { onZoomChange: (zoom: number) => void; zoom: number }) {
   const map = useMap();
@@ -49,7 +41,7 @@ function MapZoomBridge({ onZoomChange, zoom }: { onZoomChange: (zoom: number) =>
   return null;
 }
 
-export function NavigationView({ onBack, route, destinationName }: Props) {
+export function NavigationView({ onBack, route, destinationName, origin, destination }: Props) {
   const [metroEnabled, setMetroEnabled]               = useState(true);
   const [busEnabled, setBusEnabled]                   = useState(true);
   const [bikeEnabled, setBikeEnabled]                 = useState(false);
@@ -58,7 +50,10 @@ export function NavigationView({ onBack, route, destinationName }: Props) {
   const [metroCrimesEnabled, setMetroCrimesEnabled]   = useState(false);
   const [zoom, setZoom] = useState(DEFAULT_MAP_ZOOM);
   const heatmap = useHeatmapData(safetyHeatMapEnabled);
-  const routeMarkers = useMemo(() => ROUTE_POINTS, []);
+  const routeMarkers = useMemo<LatLngExpression[]>(
+    () => route.waypoints.length >= 2 ? route.waypoints : [origin, destination],
+    [route.waypoints, origin, destination],
+  );
 
   const zoomIn = () => setZoom((value) => Math.min(18, value + 1));
   const zoomOut = () => setZoom((value) => Math.max(10, value - 1));
@@ -147,7 +142,7 @@ export function NavigationView({ onBack, route, destinationName }: Props) {
       <div className="h-64 relative bg-[#E8EDE3] overflow-hidden flex-shrink-0">
         <MapContainer
           attributionControl={false}
-          center={ROUTE_CENTER}
+          center={origin}
           className="h-full w-full"
           scrollWheelZoom
           zoom={zoom}
@@ -174,7 +169,7 @@ export function NavigationView({ onBack, route, destinationName }: Props) {
                 opacity: 0.92,
                 weight: 12,
               }}
-              positions={ROUTE_POINTS}
+              positions={routeMarkers}
             />
           </Pane>
 
@@ -187,7 +182,7 @@ export function NavigationView({ onBack, route, destinationName }: Props) {
                 opacity: 0.95,
                 weight: 6,
               }}
-              positions={ROUTE_POINTS}
+              positions={routeMarkers}
             />
           </Pane>
 

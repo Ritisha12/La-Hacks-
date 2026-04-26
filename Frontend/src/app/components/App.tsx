@@ -109,6 +109,8 @@ function App() {
             onBack={() => setCurrentScreen('routes')}
             route={selectedRoute}
             destinationName={destinationName}
+            origin={origin}
+            destination={destination}
           />
         )}
         {currentScreen === 'settings' && (

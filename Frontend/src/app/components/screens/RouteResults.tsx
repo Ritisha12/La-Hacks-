@@ -31,6 +31,7 @@ export interface RouteOption {
   hasMetro: boolean;
   hasBus: boolean;
   hasWaymo: boolean;
+  waypoints: [number, number][];
 }
 
 type SortType = 'ai' | 'fastest' | 'cheapest' | 'safest';
@@ -67,11 +68,12 @@ export function RouteResults({ origin, destination, destinationName, onBack, onS
   const [sortBy, setSortBy] = React.useState<SortType>('ai');
   const [preferences, setPreferences] = React.useState<Set<PreferenceType>>(new Set(['metro', 'bus', 'bike', 'waymo']));
   const [expandedRoute, setExpandedRoute] = React.useState<number | null>(null);
+  const [selectedRouteId, setSelectedRouteId] = React.useState<number | null>(null);
   const [liveData, setLiveData] = React.useState<RouteQueryResult | null>(null);
   const [loading, setLoading] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
 
-  // Re-fetch from the backend whenever the mode preferences change
+  // Re-fetch when preferences or location change; debounce location changes so GPS jitter doesn't spam requests
   React.useEffect(() => {
     const metro = preferences.has('metro');
     const bus   = preferences.has('bus');
@@ -81,22 +83,28 @@ export function RouteResults({ origin, destination, destinationName, onBack, onS
     const prefs = uiPrefsToApiPrefs(metro, bus, bike, waymo);
     console.log('[query_routes] request:', { origin, destination, preferences: prefs });
 
-    queueMicrotask(() => {
+    let cancelled = false;
+
+    const timer = setTimeout(() => {
       setLoading(true);
       setError(null);
-    });
-    queryRoutes(origin, destination, prefs)
-      .then(result => {
-        console.log('[query_routes] response:', result);
-        setLiveData(result);
-        if (!result.all.length) setError('No live routes returned from backend.');
-      })
-      .catch(err => {
-        console.error('[query_routes] failed:', err);
-        setError('Backend request failed. Check /api/query_routes in Network tab.');
-        setLiveData({ all: [], fastest: null, cheapest: null, safest: null, car: null });
-      })
-      .finally(() => setLoading(false));
+      queryRoutes(origin, destination, prefs)
+        .then(result => {
+          if (cancelled) return;
+          console.log('[query_routes] response:', result);
+          setLiveData(result);
+          if (!result.all.length) setError('No live routes returned from backend.');
+        })
+        .catch(err => {
+          if (cancelled) return;
+          console.error('[query_routes] failed:', err);
+          setError('Could not refresh routes — showing last results.');
+          // keep liveData as-is so prices don't reset to Free
+        })
+        .finally(() => { if (!cancelled) setLoading(false); });
+    }, 600);
+
+    return () => { cancelled = true; clearTimeout(timer); };
   }, [preferences, origin, destination]);
 
   const sortOptions: SortOption[] = [
