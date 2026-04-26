@@ -1,4 +1,4 @@
-import { Search } from 'lucide-react';
+import { Search, Train, Bus, Bike, Car } from 'lucide-react';
 import { useEffect } from 'react';
 import { MapContainer, TileLayer, Marker, useMap } from 'react-leaflet';
 import L from 'leaflet';
@@ -53,7 +53,7 @@ function RecenterMap({ lat, lon }: { lat: number; lon: number }) {
 
 export function HomeScreen({ coords, gpsFixed, onSearchRoute }: Props) {
 
-  const currentPreferences = ['Metro', 'Bus', 'Bike'];
+  const currentPreferences = ['Metro', 'Bus', 'Bike', 'Waymo'];
 
   return (
     <div className="relative h-full w-full overflow-hidden">
@@ -116,10 +116,17 @@ export function HomeScreen({ coords, gpsFixed, onSearchRoute }: Props) {
                   className={`px-3 py-2 rounded-full text-xs font-medium shadow-sm ${
                     pref === 'Metro' ? 'bg-indigo-600 text-white' :
                     pref === 'Bus'   ? 'bg-orange-600 text-white' :
+                    pref === 'Waymo' ? 'bg-sky-600 text-white' :
                                        'bg-green-600 text-white'
                   }`}
                 >
-                  {pref === 'Metro' ? '🚇' : pref === 'Bus' ? '🚌' : '🚴'} {pref}
+                  <span className="flex items-center gap-1.5">
+                    {pref === 'Metro' ? <Train className="w-3.5 h-3.5" /> :
+                     pref === 'Bus'   ? <Bus   className="w-3.5 h-3.5" /> :
+                     pref === 'Waymo' ? <Car   className="w-3.5 h-3.5" /> :
+                                        <Bike  className="w-3.5 h-3.5" />}
+                    {pref}
+                  </span>
                 </div>
               ))}
             </div>

@@ -3,7 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from dotenv import load_dotenv
 from PathParsing import annotate_plan
-from SafetyScoring import get_safest
+from SafetyScoring import get_safest, annotate_safety, _tree, _intensities
 
 import asyncio
 import httpx
@@ -270,9 +270,10 @@ async def query_routes(request: RouteRequest):
     if not nodes:
         raise HTTPException(status_code=404, detail="No itineraries found.")
 
+    nodes = [annotate_safety(n, _tree, _intensities) for n in nodes]
     fastest = min(nodes, key=lambda n: n.get("duration", float("inf")))
     cheapest = min(nodes, key=lambda n: n.get("total_cost", float("inf")))
-    safest = get_safest(nodes)
+    safest = max(nodes, key=lambda n: n.get("min_safety_score", 0))
     min_walk = min(nodes, key=lambda n: n.get("walkTime", float("inf")))
     max_walk = max(nodes, key=lambda n: n.get("walkTime", 0))
 
