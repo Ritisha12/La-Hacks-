@@ -4,6 +4,7 @@ from pydantic import BaseModel
 from dotenv import load_dotenv
 from PathParsing import annotate_plan
 
+import asyncio
 import httpx
 import os
 
@@ -74,6 +75,8 @@ class ModePreferences(BaseModel):
     subway: bool = True
     tram: bool = True
     car_dropoff: bool = True
+    bicycle: bool = True
+    bicycle_rental: bool = True
 
 
 def build_modes_block(prefs: ModePreferences) -> str:
@@ -87,18 +90,38 @@ def build_modes_block(prefs: ModePreferences) -> str:
     if prefs.tram:
         transit_modes.append("{ mode: TRAM }")
 
-    access_modes = ["WALK"] if prefs.walk else []
+    # BICYCLE cannot be combined with WALK; BICYCLE_RENTAL must be combined with WALK
+    include_walk = prefs.walk and not prefs.bicycle
+
+    access_modes = ["WALK"] if include_walk else []
     if prefs.car_dropoff:
         access_modes.append("CAR_DROP_OFF")
+    if prefs.bicycle:
+        access_modes.append("BICYCLE")
+    if prefs.bicycle_rental:
+        access_modes.append("BICYCLE_RENTAL")
 
-    egress_modes = ["WALK"] if prefs.walk else []
+    egress_modes = ["WALK"] if include_walk else []
     if prefs.car_dropoff:
         egress_modes.append("CAR_PICKUP")
+    if prefs.bicycle:
+        egress_modes.append("BICYCLE")
+    if prefs.bicycle_rental:
+        egress_modes.append("BICYCLE_RENTAL")
 
-    direct_modes = ["WALK"] if prefs.walk else []
+    direct_modes = ["WALK"] if include_walk else []
+    if prefs.bicycle:
+        direct_modes.append("BICYCLE")
+    if prefs.bicycle_rental:
+        direct_modes.append("BICYCLE_RENTAL")
 
     if not transit_modes and not direct_modes:
         raise ValueError("At least one mode must be enabled.")
+
+    if prefs.bicycle:
+        transfer_modes = ["BICYCLE"]
+    else:
+        transfer_modes = ["WALK"] if prefs.walk else []
 
     lines = ["modes: {"]
     if direct_modes:
@@ -109,10 +132,34 @@ def build_modes_block(prefs: ModePreferences) -> str:
             lines.append(f"    access: [{', '.join(access_modes)}]")
         if egress_modes:
             lines.append(f"    egress: [{', '.join(egress_modes)}]")
+        if transfer_modes:
+            lines.append(f"    transfer: [{', '.join(transfer_modes)}]")
         lines.append(f"    transit: [{', '.join(transit_modes)}]")
         lines.append("  }")
     lines.append("}")
     return "\n    ".join(lines)
+
+
+def _access_variants(prefs: ModePreferences) -> list[ModePreferences]:
+    """Return one ModePreferences per access/egress strategy (walk + at most one vehicle)."""
+    base = dict(
+        walk=prefs.walk,
+        bus=prefs.bus,
+        rail=prefs.rail,
+        subway=prefs.subway,
+        tram=prefs.tram,
+        car_dropoff=False,
+        bicycle=False,
+        bicycle_rental=False,
+    )
+    variants = [ModePreferences(**base)]
+    if prefs.car_dropoff:
+        variants.append(ModePreferences(**{**base, "car_dropoff": True}))
+    if prefs.bicycle:
+        variants.append(ModePreferences(**{**base, "bicycle": True}))
+    if prefs.bicycle_rental:
+        variants.append(ModePreferences(**{**base, "bicycle_rental": True}))
+    return variants
 
 
 class RouteRequest(BaseModel):
@@ -121,8 +168,7 @@ class RouteRequest(BaseModel):
     preferences: ModePreferences = ModePreferences()
 
 
-@app.post("/query_routes")
-async def query_routes(request: RouteRequest):
+async def _fetch_plan(request: RouteRequest) -> dict:
     origin_lat, origin_lon = request.origin
     dest_lat, dest_lon = request.destination
 
@@ -161,9 +207,46 @@ async def query_routes(request: RouteRequest):
     if "errors" in data:
         raise HTTPException(status_code=400, detail=data["errors"])
 
-    routing_errors = data.get("data", {}).get("planConnection", {}).get("routingErrors", [])
-    if routing_errors:
-        raise HTTPException(status_code=400, detail=routing_errors)
-    
     plan_connection = data.get("data", {}).get("planConnection", {})
-    return {"planConnection": annotate_plan(plan_connection)}
+    if plan_connection.get("routingErrors"):
+        return {"edges": []}
+
+    return annotate_plan(plan_connection)
+
+
+async def _fetch_all_variants(request: RouteRequest) -> list[dict]:
+    variants = _access_variants(request.preferences)
+    variant_requests = [
+        RouteRequest(origin=request.origin, destination=request.destination, preferences=v)
+        for v in variants
+    ]
+    results = await asyncio.gather(*[_fetch_plan(r) for r in variant_requests])
+
+    seen = set()
+    nodes = []
+    for plan in results:
+        for edge in plan.get("edges", []):
+            node = edge["node"]
+            key = (node.get("start"), node.get("duration"))
+            if key not in seen:
+                seen.add(key)
+                nodes.append(node)
+
+    return nodes
+
+
+@app.post("/query_routes")
+async def query_routes(request: RouteRequest):
+    nodes = await _fetch_all_variants(request)
+
+    if not nodes:
+        raise HTTPException(status_code=404, detail="No itineraries found.")
+
+    fastest = min(nodes, key=lambda n: n.get("duration", float("inf")))
+    cheapest = min(nodes, key=lambda n: n.get("total_cost", float("inf")))
+
+    return {
+        "fastest": fastest,
+        "cheapest": cheapest,
+        "all": nodes,
+    }
