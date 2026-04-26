@@ -246,10 +246,14 @@ async def query_routes(request: RouteRequest):
     fastest = min(nodes, key=lambda n: n.get("duration", float("inf")))
     cheapest = min(nodes, key=lambda n: n.get("total_cost", float("inf")))
     safest = get_safest(nodes)
+    min_walk = min(nodes, key=lambda n: n.get("walkTime", float("inf")))
+    max_walk = max(nodes, key=lambda n: n.get("walkTime", 0))
 
     return {
         "fastest": fastest,
         "cheapest": cheapest,
         "safest": safest,
+        "min_walk": min_walk,
+        "max_walk": max_walk,
         "all": nodes,
     }
